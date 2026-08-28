@@ -1,0 +1,14 @@
+node_modules/
+npm-cache/
+dist/
+.env
+.env.local
+*.log
+
+# Данные бэкенда: заявки и диалоги — не в репозиторий
+backend/data/*.json
+backend/data/*.tmp
+backend/prompt.local.txt
+
+# Локальный кэш npm, если он оказался внутри проекта
+npm-cache/

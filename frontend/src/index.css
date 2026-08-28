@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 font-sans text-slate-300 antialiased;
+    /* Базовый фон живёт на body: если WebGL-слой не смонтируется, страница
+       всё равно выглядит как задумано, а не как чёрный прямоугольник. */
+    background-image:
+      radial-gradient(900px 600px at 12% -10%, rgba(99, 102, 241, 0.18), transparent 60%),
+      radial-gradient(760px 520px at 92% 8%, rgba(34, 211, 238, 0.12), transparent 62%),
+      radial-gradient(700px 700px at 50% 108%, rgba(232, 121, 249, 0.12), transparent 60%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-accent-indigo/40 text-white;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display text-white;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Уважаем системную настройку: анимации становятся мгновенными, а не убираются криво. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  input, textarea, select {
+    font-size: 16px; /* иначе iOS зумит страницу при фокусе */
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-5 sm:px-6 lg:px-10;
+  }
+
+  /* Стеклянная панель — базовый строительный блок всего интерфейса. */
+  .glass {
+    @apply rounded-3xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
+  }
+
+  .glass-strong {
+    @apply rounded-3xl border border-white/10 bg-ink-900/80 backdrop-blur-2xl;
+  }
+
+  .text-gradient {
+    @apply bg-accent-line bg-clip-text text-transparent;
+  }
+
+  /* Разрядка на узких экранах меньше: с 0.18em надпись переносится на две
+     строки и метка растягивается во всю ширину. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04]
+           px-3.5 py-1.5 text-[0.68rem] font-medium uppercase tracking-[0.1em] text-slate-400
+           sm:px-4 sm:text-xs sm:tracking-[0.18em];
+  }
+
+  .section-pad {
+    @apply py-20 md:py-28 lg:py-32;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-ink-950 focus-visible:ring-2 focus-visible:ring-accent-cyan;
+  }
+
+  /* Тонкая световая линия-разделитель между секциями. */
+  .hairline {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-white/12 to-transparent;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+
+  /* Тонкий скроллбар в панелях ассистента и админки. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+  }
+}
