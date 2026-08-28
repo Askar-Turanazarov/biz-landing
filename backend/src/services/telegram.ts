@@ -69,13 +69,42 @@ function renderMessage(lead: Lead): string {
   return rows.join('\n');
 }
 
+/**
+ * Telegram принимает в кнопках только публичные адреса: на localhost и на
+ * приватные подсети он отвечает «Wrong HTTP URL» и роняет всю отправку.
+ * В дев-режиме PUBLIC_ADMIN_URL всегда локальный, поэтому кнопку-ссылку
+ * добавляем только когда адрес действительно доступен извне.
+ */
+function isPubliclyReachable(rawUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
+  if (host === '::1' || host === '0.0.0.0') return false;
+  if (/^127\./.test(host)) return false;
+  if (/^10\./.test(host)) return false;
+  if (/^192\.168\./.test(host)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+
+  return true;
+}
+
+function adminButton() {
+  return isPubliclyReachable(config.publicAdminUrl)
+    ? [{ text: '🗂 Открыть в админке', url: config.publicAdminUrl }]
+    : [];
+}
+
 function keyboard(lead: Lead) {
   return {
     inline_keyboard: [
-      [
-        { text: '✅ Взять в работу', callback_data: `take:${lead.id}` },
-        { text: '🗂 Открыть в админке', url: config.publicAdminUrl },
-      ],
+      [{ text: '✅ Взять в работу', callback_data: `take:${lead.id}` }, ...adminButton()],
     ],
   };
 }
@@ -142,7 +171,13 @@ export function startPolling(): void {
         for (const update of data.result ?? []) {
           offset = update.update_id + 1;
           const query = update.callback_query;
-          if (!query?.data?.startsWith('take:')) continue;
+          if (!query) continue;
+
+          // Кнопка-заглушка «уже в работе»: гасим спиннер и идём дальше.
+          if (!query.data?.startsWith('take:')) {
+            await call('answerCallbackQuery', { callback_query_id: query.id }).catch(() => undefined);
+            continue;
+          }
 
           const leadId = query.data.slice('take:'.length);
           const lead = await getLead(leadId);
@@ -157,8 +192,10 @@ export function startPolling(): void {
               chat_id: query.message.chat.id,
               message_id: query.message.message_id,
               reply_markup: {
+                // callback_data, а не url: на локальном адресе Telegram
+                // отклонил бы кнопку-ссылку и правка сообщения не прошла бы.
                 inline_keyboard: [
-                  [{ text: `✅ В работе — ${manager}`, url: config.publicAdminUrl }],
+                  [{ text: `✅ В работе — ${manager}`, callback_data: 'taken' }, ...adminButton()],
                 ],
               },
             }).catch(() => undefined);
