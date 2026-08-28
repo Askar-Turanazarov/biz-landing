@@ -48,10 +48,14 @@ export const config = {
 
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN?.trim() || '',
-    chatId: process.env.TELEGRAM_CHAT_ID?.trim() || '',
+    /**
+     * Получателей может быть несколько: рабочая группа плюс личка руководителя.
+     * Перечисляются через запятую, заявка уходит в каждый чат отдельным сообщением.
+     */
+    chatIds: list(process.env.TELEGRAM_CHAT_ID),
     enablePolling: bool(process.env.TELEGRAM_ENABLE_POLLING, false),
     get enabled(): boolean {
-      return Boolean(this.botToken && this.chatId);
+      return Boolean(this.botToken && this.chatIds.length);
     },
   },
 

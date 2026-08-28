@@ -109,49 +109,86 @@ function keyboard(lead: Lead) {
   };
 }
 
-async function call(method: string, payload: unknown): Promise<{ ok: boolean; result?: any }> {
+/** Сколько секунд Telegram держит соединение открытым в getUpdates. */
+const LONG_POLL_SECONDS = 25;
+
+async function call(
+  method: string,
+  payload: unknown,
+  timeoutMs = 10_000,
+): Promise<{ ok: boolean; result?: any }> {
   const response = await fetch(API(method), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const data = (await response.json()) as { ok: boolean; result?: any; description?: string };
   if (!data.ok) throw new Error(data.description ?? `Telegram вернул ошибку на ${method}`);
   return data;
 }
 
+async function sendTo(chatId: string, lead: Lead): Promise<number | null> {
+  const data = await call('sendMessage', {
+    chat_id: chatId,
+    text: renderMessage(lead),
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    reply_markup: keyboard(lead),
+  });
+  return data.result?.message_id ?? null;
+}
+
 /**
  * Отправка «выстрелил и забыл»: вызывается ПОСЛЕ ответа клиенту.
  * Падение Telegram не должно ломать приём заявки — фиксируем статус и повторяем один раз.
+ *
+ * Получателей может быть несколько (группа + личка). Шлём во все параллельно и
+ * повторяем только те чаты, что не приняли сообщение: успешные адресаты не должны
+ * получить дубль из-за чужой ошибки.
  */
-export function notifyLead(lead: Lead, attempt = 1): void {
+export function notifyLead(lead: Lead, chatIds: string[] = config.telegram.chatIds, attempt = 1): void {
   if (!config.telegram.enabled) {
     void updateLead(lead.id, { telegramStatus: 'skipped' });
     return;
   }
 
-  void call('sendMessage', {
-    chat_id: config.telegram.chatId,
-    text: renderMessage(lead),
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    reply_markup: keyboard(lead),
-  })
-    .then(async (data) => {
-      await updateLead(lead.id, {
-        telegramStatus: 'sent',
-        telegramMessageId: data.result?.message_id ?? null,
-      });
-    })
-    .catch(async (error) => {
-      console.error(`[telegram] попытка ${attempt} не удалась:`, (error as Error).message);
-      if (attempt === 1) {
-        setTimeout(() => notifyLead(lead, 2), 30_000).unref();
+  void (async () => {
+    const results = await Promise.allSettled(chatIds.map((chatId) => sendTo(chatId, lead)));
+
+    const failed: string[] = [];
+    const sent: string[] = [];
+    let firstMessageId: number | null = null;
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        sent.push(chatIds[index]);
+        firstMessageId ??= result.value;
         return;
       }
-      await updateLead(lead.id, { telegramStatus: 'failed' });
+      failed.push(chatIds[index]);
+      console.error(
+        `[telegram] чат ${chatIds[index]}, попытка ${attempt}: ${(result.reason as Error).message}`,
+      );
     });
+
+    // Явно пишем адресатов: иначе при нескольких чатах непонятно, куда заявка дошла.
+    if (sent.length) console.log(`[telegram] заявка ${lead.id} доставлена в: ${sent.join(', ')}`);
+
+    const delivered = failed.length < chatIds.length;
+    if (delivered && firstMessageId !== null) {
+      await updateLead(lead.id, { telegramStatus: 'sent', telegramMessageId: firstMessageId });
+    }
+
+    if (!failed.length) return;
+
+    if (attempt === 1) {
+      setTimeout(() => notifyLead(lead, failed, 2), 30_000).unref();
+      return;
+    }
+    // Ни один адресат так и не принял заявку — помечаем как неудачу.
+    if (!delivered) await updateLead(lead.id, { telegramStatus: 'failed' });
+  })();
 }
 
 /**
@@ -167,7 +204,13 @@ export function startPolling(): void {
   const loop = async (): Promise<void> => {
     while (!stopped) {
       try {
-        const data = await call('getUpdates', { offset, timeout: 25, allowed_updates: ['callback_query'] });
+        // Клиентский таймаут обязан быть больше окна long polling, иначе каждый
+        // запрос обрывается на нашей стороне и обновления не приходят никогда.
+        const data = await call(
+          'getUpdates',
+          { offset, timeout: LONG_POLL_SECONDS, allowed_updates: ['callback_query'] },
+          (LONG_POLL_SECONDS + 10) * 1000,
+        );
         for (const update of data.result ?? []) {
           offset = update.update_id + 1;
           const query = update.callback_query;
