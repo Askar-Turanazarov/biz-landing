@@ -1,4 +1,6 @@
-import { company, legal, nav, services } from '../../site.config';
+import { company, hints, legal, nav, services } from '../../site.config';
+import { Hint } from '../ui/Hint';
+import { Credits } from './Credits';
 
 export function Footer() {
   return (
@@ -48,31 +50,19 @@ export function Footer() {
             ))}
           </div>
 
+          {/* Контакты вымышленной студии: без ссылок, с подсказками при наведении. */}
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Контакты
             </h3>
-            <a
-              href={company.phoneHref}
-              className="focus-ring w-fit rounded font-display text-lg font-bold text-white"
-            >
-              {company.phone}
-            </a>
-            <a
-              href={`mailto:${company.email}`}
-              className="focus-ring w-fit rounded text-sm text-slate-400 transition-colors hover:text-white"
-            >
-              {company.email}
-            </a>
-            <a
-              href={company.telegramHref}
-              target="_blank"
-              rel="noreferrer"
-              className="focus-ring w-fit rounded text-sm text-slate-400 transition-colors hover:text-white"
-            >
-              Telegram {company.telegram}
-            </a>
-            <p className="text-sm text-slate-500">{company.address}</p>
+            <Hint text={hints.phone} align="start" className="w-fit">
+              <span className="font-display text-lg font-bold text-white">{company.phone}</span>
+            </Hint>
+            <p className="text-sm text-slate-400">{company.email}</p>
+            <p className="text-sm text-slate-400">Telegram {company.telegram}</p>
+            <Hint text={hints.address} align="start" className="w-fit">
+              <span className="text-sm text-slate-500">{company.address}</span>
+            </Hint>
             <p className="text-sm text-slate-500">{company.workHours}</p>
           </div>
         </div>
@@ -80,7 +70,7 @@ export function Footer() {
         <div className="hairline my-8" />
 
         <div className="flex flex-col gap-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>{legal.copyright}</p>
+          <Credits className="w-fit" />
           <p className="max-w-md sm:text-right">
             Цены указаны в сумах и не являются публичной офертой. {legal.priceNote}
           </p>

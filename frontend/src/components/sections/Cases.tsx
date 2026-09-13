@@ -1,7 +1,8 @@
-import { cases } from '../../site.config';
+import { captions, cases } from '../../site.config';
 import { SectionHeading } from '../ui/SectionHeading';
 import { Reveal } from '../ui/Reveal';
 import { Card3D } from '../ui/Card3D';
+import { FootnoteMark } from '../layout/Credits';
 
 export function Cases() {
   return (
@@ -12,10 +13,12 @@ export function Cases() {
           title={
             <>
               Проекты, где <span className="text-gradient">цифры выросли</span>
+              <FootnoteMark large />
             </>
           }
           description="Три показательных примера из разных ниш. Метрики — из аналитики клиентов через полгода после запуска."
         />
+        <p className="mt-4 max-w-xl text-xs text-slate-600">{captions.cases}</p>
 
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
           {cases.map((item, index) => (

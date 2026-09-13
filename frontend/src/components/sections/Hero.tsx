@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { hero } from '../../site.config';
 import { Button } from '../ui/Button';
+import { Hint } from '../ui/Hint';
 import { ArrowRight, Sparkles } from '../ui/Icons';
 import { useCountUp } from '../../hooks/useCountUp';
 
@@ -49,7 +50,7 @@ export function Hero({ onOpenQuiz, onScrollToForm }: HeroProps) {
                 transition={{ duration: 0.7, delay: 0.08 + index * 0.045, ease: [0.16, 1, 0.3, 1] }}
               >
                 {word === 'заявки,' ? <span className="text-gradient">{word}</span> : word}
-                {' '}
+                {' '}
               </motion.span>
             ))}
           </h1>
@@ -95,14 +96,29 @@ export function Hero({ onOpenQuiz, onScrollToForm }: HeroProps) {
   );
 }
 
-function HeroStat({ value, suffix, label }: { value: number; suffix: string; label: string }) {
+function HeroStat({
+  value,
+  suffix,
+  label,
+  hint,
+}: {
+  value: number;
+  suffix: string;
+  label: string;
+  hint: string;
+}) {
   const { ref, value: current } = useCountUp(value);
 
   return (
     <div className="flex flex-col gap-1.5">
       <dt className="font-display text-display-md font-extrabold text-white">
-        <span ref={ref}>{current}</span>
-        <span className="text-gradient">{suffix}</span>
+        {/* Шутка про вымышленную цифру видна только тому, кто наведёт курсор. */}
+        <Hint text={hint} align="start">
+          <span>
+            <span ref={ref}>{current}</span>
+            <span className="text-gradient">{suffix}</span>
+          </span>
+        </Hint>
       </dt>
       <dd className="text-sm leading-snug text-slate-500">{label}</dd>
     </div>

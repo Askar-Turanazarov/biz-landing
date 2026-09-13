@@ -19,9 +19,11 @@ export const COMPANY = {
   since: 2016,
   team: 14,
   projects: 180,
-  email: 'hello@orbit.uz',
-  phone: '+998 (71) 200-45-90',
-  telegram: '@orbit_uz',
+  // Заглушки, как на сайте (frontend/src/site.config.ts): студия вымышленная,
+  // а настоящий на вид номер мог бы принадлежать реальному человеку.
+  email: 'hello@orbit.example',
+  phone: '+998 (71) XXX-XX-XX',
+  telegram: '@orbit_xxx',
   workHours: 'будни 10:00–19:00 по Ташкенту (UTC+5), заявки принимаем круглосуточно',
 } as const;
 

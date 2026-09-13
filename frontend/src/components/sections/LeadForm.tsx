@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { company, leadForm, legal } from '../../site.config';
+import { company, hints, leadForm, legal } from '../../site.config';
 import { Reveal } from '../ui/Reveal';
 import { Button } from '../ui/Button';
+import { Hint } from '../ui/Hint';
 import { Check, Phone, Sparkles } from '../ui/Icons';
 import { ConsentCheckbox, Field, HoneypotField, TextField } from '../ui/Field';
 import { emptyLeadForm, useLeadSubmit, type LeadFormValues } from '../../hooks/useLeadSubmit';
@@ -54,14 +55,12 @@ export function LeadForm({ onOpenQuiz }: { onOpenQuiz: () => void }) {
 
             <Reveal delay={0.2}>
               <div className="mt-auto flex flex-col gap-4 border-t border-white/[0.07] pt-7">
-                <a
-                  href={company.phoneHref}
-                  className="focus-ring flex w-fit items-center gap-3 rounded-full font-display
-                             text-2xl font-extrabold text-white transition-colors hover:text-accent-cyan"
-                >
-                  <Phone className="h-5 w-5" />
-                  {company.phone}
-                </a>
+                <Hint text={hints.phone} align="start" className="w-fit">
+                  <span className="flex items-center gap-3 font-display text-2xl font-extrabold text-white">
+                    <Phone className="h-5 w-5" />
+                    {company.phone}
+                  </span>
+                </Hint>
                 <p className="text-sm text-slate-500">
                   {company.workHours} · заявки принимаем круглосуточно
                 </p>

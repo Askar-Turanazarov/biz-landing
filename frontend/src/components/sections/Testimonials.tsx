@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { testimonials } from '../../site.config';
+import { captions, testimonials } from '../../site.config';
 import { SectionHeading } from '../ui/SectionHeading';
 import { Reveal } from '../ui/Reveal';
 import { ArrowRight, Star } from '../ui/Icons';
+import { FootnoteMark } from '../layout/Credits';
 
 /**
  * Отзывы — горизонтальная лента со scroll-snap.
@@ -46,14 +47,18 @@ export function Testimonials() {
     <section className="section-pad overflow-hidden">
       <div className="container-page">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <SectionHeading
-            eyebrow="Отзывы"
-            title={
-              <>
-                Что говорят те, <span className="text-gradient">кто уже запустился</span>
-              </>
-            }
-          />
+          <div>
+            <SectionHeading
+              eyebrow="Отзывы"
+              title={
+                <>
+                  Что говорят те, <span className="text-gradient">кто уже запустился</span>
+                  <FootnoteMark large />
+                </>
+              }
+            />
+            <p className="mt-4 max-w-xl text-xs text-slate-600">{captions.testimonials}</p>
+          </div>
 
           <div className="flex gap-3">
             <button

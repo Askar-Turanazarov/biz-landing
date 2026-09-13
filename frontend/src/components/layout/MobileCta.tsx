@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { company } from '../../site.config';
-import { Phone, Sparkles } from '../ui/Icons';
+import { openAssistant } from '../../assistant/useAssistantStore';
+import { Send, Sparkles } from '../ui/Icons';
 
 /**
- * Липкая панель действий на телефонах: звонок и запуск подбора всегда под рукой.
- * Появляется только после первого экрана, чтобы не перекрывать hero,
- * и прячется, когда открыт помощник.
+ * Липкая панель действий на телефонах: вопрос помощнику и запуск подбора всегда под рукой.
+ * Звонка здесь нет — номер студии вымышленный. Панель появляется только после первого экрана,
+ * чтобы не перекрывать hero, и прячется, когда открыт помощник.
  */
 export function MobileCta({ onOpenQuiz, hidden }: { onOpenQuiz: () => void; hidden: boolean }) {
   const [visible, setVisible] = useState(false);
@@ -30,14 +30,14 @@ export function MobileCta({ onOpenQuiz, hidden }: { onOpenQuiz: () => void; hidd
                      bg-ink-950/90 px-4 pt-3 backdrop-blur-xl md:hidden"
         >
           <div className="flex items-center gap-3">
-            <a
-              href={company.phoneHref}
+            <button
+              onClick={() => openAssistant('chat')}
               className="focus-ring grid h-12 w-12 shrink-0 place-items-center rounded-full
                          border border-white/12 text-white"
-              aria-label={`Позвонить ${company.phone}`}
+              aria-label="Написать ИИ-помощнику"
             >
-              <Phone className="h-5 w-5" />
-            </a>
+              <Send className="h-5 w-5" />
+            </button>
             <button
               onClick={onOpenQuiz}
               className="focus-ring flex h-12 flex-1 items-center justify-center gap-2 rounded-full

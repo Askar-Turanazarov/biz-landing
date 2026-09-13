@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { company, nav } from '../../site.config';
+import { company, hints, nav } from '../../site.config';
 import { Button } from '../ui/Button';
+import { Hint } from '../ui/Hint';
 import { Close, Menu, Phone } from '../ui/Icons';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
@@ -68,15 +69,17 @@ export function Header({ onOpenAssistant }: { onOpenAssistant: () => void }) {
           <div className="flex items-center gap-2">
             {/* Узбекский номер длиннее российского: до 1280 он вместе с меню
                 и кнопкой не помещается в строку и переносится. */}
-            <a
-              href={company.phoneHref}
-              className="focus-ring hidden items-center gap-2 whitespace-nowrap rounded-full px-3
-                         py-2 text-sm font-medium text-slate-300 transition-colors
-                         hover:text-white tab:flex lg:hidden xl:flex"
-            >
-              <Phone className="h-4 w-4" />
-              {company.phone}
-            </a>
+            <span className="hidden tab:flex lg:hidden xl:flex">
+              <Hint text={hints.phone} side="bottom" align="end">
+                <span
+                  className="flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm
+                             font-medium text-slate-300"
+                >
+                  <Phone className="h-4 w-4" />
+                  {company.phone}
+                </span>
+              </Hint>
+            </span>
             <Button onClick={onOpenAssistant} size="md" className="hidden xs:inline-flex" magnetic>
               Обсудить проект
             </Button>
@@ -133,13 +136,12 @@ export function Header({ onOpenAssistant }: { onOpenAssistant: () => void }) {
               ))}
 
               <div className="mt-auto flex flex-col gap-3 pt-6">
-                <a
-                  href={company.phoneHref}
-                  className="focus-ring flex items-center gap-2 rounded-2xl px-4 py-3 text-slate-200"
-                >
-                  <Phone className="h-4 w-4" />
-                  {company.phone}
-                </a>
+                <Hint text={hints.phone} align="start" className="w-fit">
+                  <span className="flex items-center gap-2 rounded-2xl px-4 py-3 text-slate-200">
+                    <Phone className="h-4 w-4" />
+                    {company.phone}
+                  </span>
+                </Hint>
                 <Button
                   onClick={() => {
                     setMenuOpen(false);

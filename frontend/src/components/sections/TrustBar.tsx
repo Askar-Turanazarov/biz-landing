@@ -1,4 +1,5 @@
 import { trustLogos } from '../../site.config';
+import { FootnoteMark } from '../layout/Credits';
 
 /**
  * Бегущая строка клиентов. Список дублируется, а анимация сдвигает ленту
@@ -11,6 +12,7 @@ export function TrustBar() {
       <div className="container-page mb-6">
         <p className="text-center text-xs uppercase tracking-[0.22em] text-slate-600">
           Нам доверяют
+          <FootnoteMark />
         </p>
       </div>
 

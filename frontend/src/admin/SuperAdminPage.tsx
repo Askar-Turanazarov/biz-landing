@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../lib/api';
-import { legal } from '../site.config';
+import { Credits } from '../components/layout/Credits';
 import {
   adminApi,
   formatDate,
@@ -236,7 +236,7 @@ export default function SuperAdminPage() {
       </main>
 
       <footer className="container-page mt-12 border-t border-white/[0.07] pt-6 text-xs text-slate-600">
-        {legal.copyright}
+        <Credits />
       </footer>
 
       <LeadDrawer
