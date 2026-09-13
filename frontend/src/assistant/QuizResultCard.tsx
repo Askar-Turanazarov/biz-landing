@@ -1,5 +1,6 @@
 import type { QuizResult } from '../lib/api';
 import { formatSumFrom, formatUsdApprox } from '../lib/price';
+import { RichText } from '../components/ui/RichText';
 import type { QuizResultStatus } from './useAssistantStore';
 
 /**
@@ -50,7 +51,7 @@ export function QuizResultCard({
         </p>
       )}
 
-      {text && <p className="mt-3 text-sm leading-relaxed text-slate-300">{text}</p>}
+      {text && <RichText text={text} className="mt-3 text-sm leading-relaxed text-slate-300" />}
     </div>
   );
 }

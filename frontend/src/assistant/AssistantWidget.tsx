@@ -5,8 +5,9 @@ import { useAssistantStore } from './useAssistantStore';
 import { QuizView } from './QuizView';
 import { ChatView } from './ChatView';
 import { ContactView } from './ContactView';
+import { DoneView } from './DoneView';
 import { Button } from '../components/ui/Button';
-import { Check, Close, Sparkles } from '../components/ui/Icons';
+import { Close, Sparkles } from '../components/ui/Icons';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 
 export function AssistantWidget() {
@@ -49,9 +50,10 @@ export function AssistantWidget() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+              // На десктопе панель крупнее: итог подбора из двух абзацев и форма должны помещаться без тесноты.
               className="glass-strong fixed inset-0 z-50 flex flex-col overflow-hidden rounded-none
-                         shadow-panel md:inset-auto md:bottom-6 md:right-6 md:h-[min(38rem,calc(100vh-6rem))]
-                         md:w-[25rem] md:rounded-3xl"
+                         shadow-panel md:inset-auto md:bottom-6 md:right-6 md:h-[min(46rem,calc(100vh-5rem))]
+                         md:w-[28rem] md:rounded-3xl lg:w-[32rem]"
             >
               <Header onClose={close} onReset={reset} showReset={mode !== 'menu'} />
 
@@ -158,25 +160,6 @@ function MenuView({ onQuiz, onChat }: { onQuiz: () => void; onChat: () => void }
           Отвечает ИИ. Сложные вопросы передадим менеджеру.
         </p>
       </div>
-    </div>
-  );
-}
-
-function DoneView({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 p-8 text-center">
-      <span className="relative grid h-16 w-16 place-items-center rounded-full bg-accent-line text-ink-950">
-        <Check className="h-8 w-8" />
-        <span aria-hidden className="absolute inset-0 animate-pulse-ring rounded-full bg-accent-cyan/40" />
-      </span>
-      <h3 className="font-display text-xl font-extrabold text-white">Заявка принята</h3>
-      <p className="max-w-xs text-sm leading-relaxed text-slate-400">
-        Расчёт и предложение по срокам пришлём в течение рабочего дня. Если вопрос срочный —
-        позвоните, ответим быстрее.
-      </p>
-      <Button variant="outline" onClick={onClose}>
-        Вернуться на сайт
-      </Button>
     </div>
   );
 }

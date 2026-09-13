@@ -464,5 +464,5 @@ export const legal = {
   consent:
     'Отправляя форму, вы соглашаетесь на обработку персональных данных и с политикой конфиденциальности.',
   priceNote: `Цены указаны в сумах. Сумма в долларах — справочная, по условному курсу $1 = ${USD_RATE.toLocaleString('ru-RU')} сум.`,
-  copyright: `© ${new Date().getFullYear()} ORBIT. Все права защищены.`,
+  copyright: `© ${new Date().getFullYear()} ORBIT - Askar Turanazarov. Все права защищены.`,
 };

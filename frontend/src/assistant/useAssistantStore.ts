@@ -18,6 +18,12 @@ export interface AssistantMessage {
   text: string;
 }
 
+/** Что посетитель отправил в заявке — показываем на экране «Заявка принята». */
+export interface SubmittedLead {
+  name: string;
+  contact: string;
+}
+
 let messageCounter = 0;
 const nextId = () => `m${(messageCounter += 1)}`;
 
@@ -31,6 +37,7 @@ interface AssistantState {
   /** Итог подбора после последнего шага: формат и цены от сервера, пояснение от ИИ. */
   quizResult: QuizResult | null;
   quizResultStatus: QuizResultStatus;
+  submittedLead: SubmittedLead | null;
   isTyping: boolean;
 
   open: (mode?: AssistantMode) => void;
@@ -41,7 +48,7 @@ interface AssistantState {
   answerQuiz: (option: QuizOption) => void;
   goBackQuiz: () => void;
   sendMessage: (text: string) => Promise<void>;
-  finish: () => void;
+  finish: (lead: SubmittedLead) => void;
   reset: () => void;
 }
 
@@ -60,6 +67,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   quizIndex: 0,
   quizAnswers: [],
   ...noResult,
+  submittedLead: null,
   isTyping: false,
 
   open: (mode = 'menu') => set({ isOpen: true, mode }),
@@ -72,6 +80,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       quizIndex: 0,
       quizAnswers: [],
       ...noResult,
+      submittedLead: null,
       messages: [greeting(), { id: nextId(), role: 'assistant', text: assistant.quizIntro }],
     }),
 
@@ -173,7 +182,8 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     }
   },
 
-  finish: () => set({ mode: 'done' }),
+  // История диалога и итог подбора не стираются: экран «Заявка принята» показывает их целиком.
+  finish: (lead) => set({ mode: 'done', submittedLead: lead }),
 
   reset: () =>
     set({
@@ -182,6 +192,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       quizIndex: 0,
       quizAnswers: [],
       ...noResult,
+      submittedLead: null,
       isTyping: false,
     }),
 }));

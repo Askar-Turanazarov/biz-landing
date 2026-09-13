@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ApiError } from '../lib/api';
+import { legal } from '../site.config';
 import {
   adminApi,
   formatDate,
@@ -97,7 +99,7 @@ export default function SuperAdminPage() {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="flex min-h-screen flex-col pb-8">
       <header className="border-b border-white/[0.07] bg-ink-950/80 backdrop-blur-xl">
         <div className="container-page flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
@@ -107,6 +109,13 @@ export default function SuperAdminPage() {
             <span className="font-display font-extrabold text-white">Панель управления</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              to="/"
+              className="focus-ring rounded-full border border-white/10 px-4 py-2 text-xs
+                         text-slate-300 transition-colors hover:bg-white/[0.06]"
+            >
+              На сайт
+            </Link>
             <a
               href={adminApi.exportUrl(filters)}
               className="focus-ring rounded-full border border-white/10 px-4 py-2 text-xs
@@ -124,7 +133,7 @@ export default function SuperAdminPage() {
         </div>
       </header>
 
-      <main className="container-page pt-8">
+      <main className="container-page flex-1 pt-8">
         {stats && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Всего заявок" value={stats.total} />
@@ -225,6 +234,10 @@ export default function SuperAdminPage() {
           )}
         </div>
       </main>
+
+      <footer className="container-page mt-12 border-t border-white/[0.07] pt-6 text-xs text-slate-600">
+        {legal.copyright}
+      </footer>
 
       <LeadDrawer
         lead={selected}

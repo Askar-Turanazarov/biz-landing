@@ -27,7 +27,7 @@ export function ContactView() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const ok = await submit(values);
-    if (ok) finish();
+    if (ok) finish({ name: values.name.trim(), contact: values.contact.trim() });
   };
 
   return (

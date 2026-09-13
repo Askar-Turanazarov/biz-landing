@@ -1,25 +1,37 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { RichText } from '../components/ui/RichText';
 import type { AssistantMessage } from './useAssistantStore';
 
-/** Лента сообщений с автопрокруткой к последнему и индикатором набора. */
+/**
+ * Лента сообщений с автопрокруткой к последнему и индикатором набора.
+ * scrollable={false} — лента внутри чужого скролла (экран «Заявка принята»):
+ * без своей прокрутки и без автопрокрутки вниз.
+ */
 export function MessageList({
   messages,
   isTyping,
+  scrollable = true,
   className = '',
 }: {
   messages: AssistantMessage[];
   isTyping: boolean;
+  scrollable?: boolean;
   className?: string;
 }) {
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!scrollable) return;
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, isTyping]);
+  }, [messages.length, isTyping, scrollable]);
 
   return (
-    <div className={`scroll-thin flex flex-col gap-3 overflow-y-auto px-5 py-4 ${className}`}>
+    <div
+      className={`flex flex-col gap-3 ${
+        scrollable ? 'scroll-thin overflow-y-auto px-5 py-4' : 'py-3'
+      } ${className}`}
+    >
       {messages.map((message) => (
         <motion.div
           key={message.id}
@@ -32,7 +44,7 @@ export function MessageList({
               : 'self-start border border-white/[0.08] bg-white/[0.04] text-slate-200'
           }`}
         >
-          {message.text}
+          {message.role === 'assistant' ? <RichText text={message.text} /> : message.text}
         </motion.div>
       ))}
 

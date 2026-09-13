@@ -13,6 +13,7 @@ import {
 } from './adminApi';
 import { Close, Phone } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
+import { RichText } from '../components/ui/RichText';
 import { QualificationBlock } from './QualificationBlock';
 
 const STATUSES: LeadStatus[] = ['new', 'in_work', 'won', 'lost'];
@@ -179,7 +180,7 @@ export function LeadDrawer({ lead, onClose, onChanged, onDeleted }: LeadDrawerPr
                           : 'self-start border border-white/[0.08] bg-white/[0.04] text-slate-300'
                       }`}
                     >
-                      {message.text}
+                      <RichText text={message.text} />
                       {message.model && (
                         <span className="mt-1 block text-[10px] text-slate-600">{message.model}</span>
                       )}
