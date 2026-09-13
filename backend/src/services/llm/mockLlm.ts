@@ -95,25 +95,38 @@ export function mockQuizComment(answer: string): string {
   return `Понял: ${answer.toLowerCase()}. Учтём это при расчёте сметы.`;
 }
 
-/** Итог квиза без модели: тот же расчёт, только шаблонным текстом. */
+/** Итог квиза без модели: тот же расчёт шаблонным текстом — два абзаца, формат жирным. */
 export function mockQuizResult(match: QuizMatch): string {
   const { service, alternative } = match;
-  const parts = [
+  const includes = SERVICES.find((s) => s.id === service.id)?.includes ?? [];
+
+  const first = [
     match.inferred
-      ? `По вашим ответам лучше всего подходит ${service.title.toLowerCase()}: он закрывает главную цель без лишних затрат.`
-      : `${service.title} — хороший выбор под вашу задачу, срок ${service.duration}.`,
-  ];
+      ? `По вашим ответам лучше всего подходит **${service.title}**: он закрывает главную цель без лишних затрат.`
+      : `**${service.title}** — хороший выбор под вашу задачу.`,
+    includes.length ? `В работу входят: ${includes.map((item) => item.toLowerCase()).join(', ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const second: string[] = [];
   if (alternative) {
-    parts.push(
-      `Чтобы уложиться в бюджет, можно начать с формата «${alternative.title}» и добавить остальное вторым этапом.`,
+    second.push(
+      `Чтобы уложиться в бюджет, можно начать с формата **${alternative.title}** и добавить остальное вторым этапом.`,
     );
   } else if (match.budgetFit === 'close') {
-    parts.push('Бюджет близок к стартовой цене — обсудим объём первого этапа.');
+    second.push('Бюджет близок к стартовой цене — обсудим объём первого этапа.');
   }
   if (match.deadlineFit === 'tight') {
-    parts.push('Срок сжатый — предложим запуск по этапам, чтобы главное заработало быстрее.');
+    second.push(
+      `Обычно такой проект занимает ${service.duration}, поэтому предложим запуск по этапам, чтобы главное заработало быстрее.`,
+    );
   }
-  return parts.join(' ');
+  if (!second.length) {
+    second.push('После заявки проведём короткий бриф и пришлём смету со сроками — обычно в течение рабочего дня.');
+  }
+
+  return `${first}\n\n${second.join(' ')}`;
 }
 
 /** Выжимка для менеджера без модели: пометки расчёта одной строкой. */

@@ -61,7 +61,8 @@ export async function quizResultText(match: QuizMatch, answers: QuizAnswer[]): P
     messages: [
       { role: 'user', text: `ОТВЕТЫ ПОСЕТИТЕЛЯ\n${answersText(answers)}\n\nРАСЧЁТ\n${matchFacts(match)}` },
     ],
-    maxTokens: 250,
+    // Два абзаца до 130 слов: русский текст расходует токены заметно быстрее английского.
+    maxTokens: 600,
   });
 
   return result ?? { text: mockQuizResult(match), model: 'mock' };

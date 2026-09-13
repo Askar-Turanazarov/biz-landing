@@ -185,6 +185,9 @@ export function matchFacts(match: QuizMatch): string {
     `Бюджет: ${BUDGET_FACT[match.budgetFit]}.`,
     `Срок: ${DEADLINE_FACT[match.deadlineFit]}.`,
   ];
+  // Состав услуги из базы знаний: модели есть о чём рассказать подробно, ничего не выдумывая.
+  const includes = serviceById(service.id)?.includes;
+  if (includes?.length) lines.splice(1, 0, `Что входит: ${includes.join(', ')}.`);
   if (alternative) {
     lines.push(
       `Альтернатива в рамках бюджета: ${alternative.title}, ${priceLabel(alternative.priceFrom)}, срок ${alternative.duration}.`,
