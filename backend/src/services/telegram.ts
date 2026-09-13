@@ -5,6 +5,7 @@
  * Настройка: создать бота у @BotFather, добавить его в группу, написать туда
  * любое сообщение и взять chat.id из https://api.telegram.org/bot<TOKEN>/getUpdates
  */
+import { request } from 'node:https';
 import { config } from '../config.js';
 import { getLead, updateLead } from './leadStore.js';
 import { TIMEZONE, priceLabel } from './knowledgeBase.js';
@@ -294,6 +295,46 @@ export async function handleUpdate(update: TelegramUpdate): Promise<void> {
 }
 
 /**
+ * getUpdates для long polling идёт через node:https, а не через fetch.
+ * В Node 26 (undici 8) POST-запрос fetch к тому же хосту ждёт, пока завершится уже открытый
+ * POST long polling: sendMessage не укладывался в свой таймаут, и заявки не доходили до чатов.
+ * Отдельный https-запрос не делит с fetch пул соединений.
+ */
+function pollUpdates(offset: number): Promise<TelegramUpdate[]> {
+  const body = JSON.stringify({ offset, timeout: LONG_POLL_SECONDS, allowed_updates: ['callback_query'] });
+
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        host: 'api.telegram.org',
+        path: `/bot${config.telegram.botToken}/getUpdates`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        // Таймаут обязан быть больше окна long polling, иначе запрос обрывается раньше ответа.
+        timeout: (LONG_POLL_SECONDS + 10) * 1000,
+      },
+      (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk: string) => (raw += chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(raw) as { ok: boolean; result?: TelegramUpdate[]; description?: string };
+            if (data.ok) resolve(data.result ?? []);
+            else reject(new Error(data.description ?? 'Telegram вернул ошибку на getUpdates'));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    req.on('timeout', () => req.destroy(new Error('таймаут getUpdates')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+/**
  * Long polling для кнопки «Взять в работу» на localhost. Включается флагом TELEGRAM_ENABLE_POLLING.
  * На Vercel вместо него работает вебхук: там нет процесса, который жил бы между запросами.
  */
@@ -306,14 +347,7 @@ export function startPolling(): void {
   const loop = async (): Promise<void> => {
     while (!stopped) {
       try {
-        // Клиентский таймаут обязан быть больше окна long polling, иначе каждый
-        // запрос обрывается на нашей стороне и обновления не приходят никогда.
-        const data = await call(
-          'getUpdates',
-          { offset, timeout: LONG_POLL_SECONDS, allowed_updates: ['callback_query'] },
-          (LONG_POLL_SECONDS + 10) * 1000,
-        );
-        for (const update of (data.result ?? []) as TelegramUpdate[]) {
+        for (const update of await pollUpdates(offset)) {
           offset = update.update_id + 1;
           await handleUpdate(update);
         }
