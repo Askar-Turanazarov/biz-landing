@@ -1,21 +1,39 @@
-# ORBIT — продающий лендинг с ИИ-помощником
+# ORBIT — AI-powered landing page
 
-Одностраничник студии веб-разработки со встроенным ИИ-ассистентом, который отвечает
-на вопросы об услугах и мягко доводит посетителя до заявки — через квиз или свободный чат.
-Заявки одновременно падают в скрытую админку `/superadmin` и в Telegram-группу отдела продаж.
+**[English](#english) · [O'zbekcha](#ozbekcha) · [Русский](#русский)**
 
-Контекст сайта — Узбекистан: цены в сумах со справочным ориентиром в долларах,
-телефоны `+998`, время в часовом поясе Ташкента (UTC+5).
+Live demo: **https://biz-landing-askar.vercel.app**
 
-```
-business-landing/
-├── frontend/   Vite + React 18 + TypeScript + Tailwind + three.js
-└── backend/    Express + TypeScript (ESM), заявки в JSON-файле
-```
+---
 
-## Быстрый старт
+## English
 
-Нужен Node 20+ (проверено на 24).
+> Learning project.
+
+A sales landing page for a web development studio with a built-in AI assistant. The assistant answers
+questions about services, runs a short quiz, recommends a format with a price estimate and qualifies the lead.
+Leads go to a hidden admin panel and to Telegram.
+
+### Features
+
+- **AI quiz** — five questions; the format, budget fit and timing are calculated in code from the price list,
+  and the AI explains the recommendation in two short paragraphs.
+- **AI chat** — answers from a knowledge base. A model chain (Gemini → Claude → scripted answers) switches
+  instantly on rate limits or errors, so the visitor never sees an error.
+- **Lead qualification** — hot / warm / cold label, an AI summary and the next step for the manager.
+- **Telegram** — instant notifications with a "take lead" button (long polling locally, webhook on Vercel).
+- **Admin panel** at `/superadmin` — password login, statistics, filters, dialog history, CSV export.
+- **3D background** on a single WebGL canvas; three.js is not downloaded on phones.
+- **Anti-spam** — honeypot field, minimum fill time, rate limiting.
+
+### Stack
+
+React 18 · Vite · TypeScript · Tailwind CSS · three.js / React Three Fiber · Express · Gemini & Claude APIs ·
+Upstash Redis · Vercel
+
+### Quick start
+
+Requires Node 20+.
 
 ```bash
 cd backend && npm install && cp .env.example .env && npm run dev
@@ -25,184 +43,237 @@ cd backend && npm install && cp .env.example .env && npm run dev
 cd frontend && npm install && npm run dev
 ```
 
-Фронтенд поднимется на <http://localhost:5173>, бэкенд — на `:3001`.
-Vite проксирует `/api` на бэкенд, поэтому адрес API нигде не хардкодится.
+The site runs at http://localhost:5173, the API at `:3001` (Vite proxies `/api`). The site works without API keys:
+the assistant falls back to scripted answers and leads are saved to `backend/data/*.json`.
 
-**Сайт полностью работает без единого ключа.** Без `GEMINI_API_KEY` и `ANTHROPIC_API_KEY`
-ассистент отвечает сценарными заготовками из базы знаний, заявки пишутся в `backend/data/leads.json`,
-Telegram молча пропускается. Ключи и токены добавляются по мере надобности.
-
-## Настройка
-
-Все настройки — в `backend/.env` (образец с комментариями лежит в `.env.example`).
-
-### ИИ-помощник
-
-```env
-GEMINI_API_KEY=...
-GEMINI_MODELS=gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.6-flash
-ANTHROPIC_API_KEY=...
-ANTHROPIC_MODELS=claude-haiku-4-5,claude-sonnet-5
-```
-
-Модели перечисляются через запятую, порядок = приоритет. Взяты быстрые нерассуждающие
-модели: для ответов про сроки и прайс reasoning только добавляет задержку и стоимость.
-
-**Как работает переключение.** При лимите (429), перегрузе или таймауте backend
-**не ждёт и не повторяет запрос к той же модели** — он сразу берёт следующую запись цепочки.
-Проблемная модель уходит в паузу (по заголовку `retry-after`, иначе 30 с → 2 мин → 10 мин),
-а при битом ключе или несуществующем ID модели (400/401/403/404) выключается до перезапуска
-с одной строкой в логе. Если недоступны все модели, отвечает сценарный mock.
-Посетитель не видит ни ошибки, ни лишнего ожидания.
-
-Текущее состояние цепочки видно в `GET /api/health`.
-
-### Telegram
-
-1. Создайте бота у [@BotFather](https://t.me/BotFather), получите токен.
-2. Добавьте бота в группу отдела продаж и дайте ему права администратора.
-3. Напишите в группу любое сообщение.
-4. Откройте `https://api.telegram.org/bot<ТОКЕН>/getUpdates` и возьмите `result[].message.chat.id`
-   — это отрицательное число вида `-1001234567890`.
-
-```env
-TELEGRAM_BOT_TOKEN=123456:AA...
-TELEGRAM_CHAT_ID=-1001234567890,123456789
-TELEGRAM_ENABLE_POLLING=true
-```
-
-`TELEGRAM_CHAT_ID` принимает несколько чатов через запятую — заявка уйдёт в каждый
-отдельным сообщением (например, в рабочую группу и в личку руководителю).
-ID группы отрицательный, ID личного чата — положительный. В логе после отправки
-видна строка `[telegram] заявка <id> доставлена в: …` со списком адресатов.
-
-Две частые ошибки при настройке:
-
-- **приходит только в личку** — в `TELEGRAM_CHAT_ID` попал ID личного чата вместо
-  группы. Проверить, что это за чат: `getChat?chat_id=<ID>`, поле `type` должно быть
-  `group` или `supergroup`;
-- **группу повысили до супергруппы** — при этом её ID меняется (было `-542…`, стало
-  `-1004…`). Старый ID перестаёт работать, нужно взять новый из `getUpdates`.
-
-`TELEGRAM_ENABLE_POLLING` включает long polling — он нужен только для кнопки
-«Взять в работу» под заявкой. Включайте на одном инстансе: два процесса будут
-разбирать одни и те же обновления. Вебхук не используем осознанно — на localhost
-он не работает без публичного туннеля.
-
-### Админка
-
-```env
-ADMIN_PASSWORD=длинный-пароль
-ADMIN_SECRET=длинная-случайная-строка
-```
-
-`ADMIN_SECRET` подписывает токен сессии. Обязательно поменяйте оба значения перед публикацией —
-при старте backend предупредит, если они остались дефолтными.
-
-## Что где лежит
-
-| Что менять | Файл |
-|---|---|
-| Тексты, услуги, цены, отзывы, FAQ, шаги квиза | `frontend/src/site.config.ts` |
-| Курс доллара и формат цен | `frontend/src/lib/price.ts` |
-| Знания ассистента (должны совпадать с сайтом) | `backend/src/services/knowledgeBase.ts` |
-| Правила подбора формата и метки заявки | `backend/src/services/qualification.ts` |
-| Характер и правила ассистента | `backend/src/services/systemPrompt.ts` |
-| Палитра, шрифты, брейкпоинты | `frontend/tailwind.config.ts` |
-| 3D-сцена | `frontend/src/three/` |
-
-Правки промпта под конкретного клиента можно положить в `backend/prompt.local.txt` —
-файл подхватится при старте и не уедет в git.
-
-> Цены на сайте и в базе знаний бэкенда дублируются намеренно (фронт и бэк — разные пакеты).
-> При изменении прайса правьте **оба** файла, иначе ассистент начнёт противоречить странице.
-
-## Как устроена графика
-
-Вся 3D-сцена живёт в **одном** `<canvas>`, растянутом фиксированным слоем за всей страницей.
-Секции не создают собственные канвасы: каждый лишний WebGL-контекст — это отдельный цикл
-рендера, и именно от этого на среднем Android начинается просадка до 25–40 fps.
-По прогрессу скролла сцена перетекает между тремя состояниями: кристалл → орбитальные
-кольца → поле частиц.
-
-Профиль устройства (`useDeviceTier`) решает, что показывать:
-
-| Профиль | Когда | Что происходит |
-|---|---|---|
-| `low` | тач-устройства, `prefers-reduced-motion` | Canvas **не монтируется**, чанк three.js (~220 КБ gzip) не скачивается. Вместо него CSS-градиент и SVG-зерно |
-| `mid` | ≤ 4 ядер, узкое окно | DPR 1, меньше частиц |
-| `high` | десктоп | DPR до 1.75, полный визуал |
-
-Прогресс скролла и позиция курсора лежат в zustand-сторе и читаются внутри `useFrame`,
-минуя состояние React: прокрутка не вызывает ни одного ререндера дерева.
-
-## Полезные команды
+Checks before committing:
 
 ```bash
-cd backend && npm run typecheck
+cd backend && npm run typecheck && cd ../frontend && npm run build
 ```
 
-```bash
-cd frontend && npm run build
-```
+### Configuration
 
-После `npm run build` во фронтенде backend начинает раздавать `frontend/dist` сам —
-можно проверить прод-сборку целиком на `http://localhost:3001` (нужен перезапуск backend).
+All settings live in `backend/.env` (see `.env.example` for comments).
 
-## Деплой на Vercel (бесплатно)
-
-Проект Vercel не видит файлы вне своей корневой папки, поэтому репозиторий подключается
-**двумя проектами**: API (`backend`) и сайт (`frontend`). Сайт проксирует `/api/*` на API-проект
-через `frontend/vercel.json` — браузер ходит на один домен, и cookie админки работают.
-
-Тариф Hobby бесплатный, но только для некоммерческого использования: для учебного демо подходит,
-для реального клиента нужен Pro.
-
-### 1. Проект API
-
-1. Vercel → **Add New… → Project** → импорт репозитория, **Root Directory: `backend`**,
-   имя проекта `biz-landing-api`. Express Vercel определит сам по `src/index.ts`.
-2. **Storage → Upstash Redis** (бесплатный план) → подключить к проекту. Переменные хранилища
-   Vercel добавит сам. Без них заявки на Vercel не сохраняются между запросами.
-3. **Settings → Environment Variables**:
-
-| Переменная | Значение |
+| Variable | Purpose |
 |---|---|
-| `GEMINI_API_KEY`, `GEMINI_MODELS` | как в локальном `.env` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | как в локальном `.env` |
-| `TELEGRAM_WEBHOOK_SECRET` | случайная строка: латиница, цифры, `_`, `-` |
-| `ADMIN_PASSWORD` | новый длинный пароль |
-| `ADMIN_SECRET` | новая длинная случайная строка |
-| `FRONTEND_ORIGIN` | `https://biz-landing.vercel.app` |
-| `PUBLIC_ADMIN_URL` | `https://biz-landing.vercel.app/superadmin` |
+| `GEMINI_API_KEY`, `GEMINI_MODELS` | Gemini key and model chain (order = priority) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | optional Claude fallback |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | bot token and chat IDs (comma-separated) |
+| `TELEGRAM_ENABLE_POLLING` | "take lead" button on localhost |
+| `TELEGRAM_WEBHOOK_SECRET` | webhook secret on Vercel |
+| `ADMIN_PASSWORD`, `ADMIN_SECRET` | admin login and session signing |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` or `KV_REST_API_URL` / `_TOKEN` | storage on Vercel |
 
-4. **Deployments → Redeploy**, чтобы переменные подхватились. Проверка:
-   `https://biz-landing-api.vercel.app/api/health` — в ответе `"storage": "upstash"`
-   и `"telegramButtons": "вебхук"`.
+### Deploying to Vercel
 
-### 2. Проект сайта
+The repository is deployed as **two Vercel projects**, because a Vercel project cannot read folders outside
+its root directory.
 
-1. Ещё раз **Add New… → Project** → тот же репозиторий, **Root Directory: `frontend`**,
-   имя `biz-landing`. Vercel определит Vite, переменные окружения не нужны.
-2. Если имя API-проекта получилось другим, поправьте адрес в `frontend/vercel.json` и запушьте.
-
-### 3. Кнопка «Взять в работу» (вебхук)
-
-Один раз откройте в браузере, подставив токен бота и секрет вебхука:
+1. **API** — Root Directory `backend`, project name `biz-landing-api`. Connect **Upstash Redis**
+   (Storage, custom prefix `KV`), add the variables above plus `FRONTEND_ORIGIN` and `PUBLIC_ADMIN_URL`
+   pointing to the site domain, then redeploy.
+2. **Site** — Root Directory `frontend`. `frontend/vercel.json` proxies `/api` to the API project;
+   change the address there if your API project has a different name.
+3. Register the Telegram webhook once:
 
 ```text
-https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=https://biz-landing-api.vercel.app/api/telegram/webhook&secret_token=<СЕКРЕТ>&allowed_updates=%5B%22callback_query%22%5D
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://biz-landing-api.vercel.app/api/telegram/webhook&secret_token=<SECRET>&allowed_updates=%5B%22callback_query%22%5D
 ```
 
-Ответ `"ok":true` — готово. После этого long polling этого же бота на localhost будет получать
-ошибку 409: для локальной разработки заведите второго бота или поставьте `TELEGRAM_ENABLE_POLLING=false`.
+After that set `TELEGRAM_ENABLE_POLLING=false` locally or use a separate bot for development.
 
-## Проверка ключевых сценариев
+### Project structure
 
-- **Квиз**: пройти пять вопросов → карточка «Вам подойдёт» с форматом, ценой и сроком;
-  если бюджета не хватает — строка с альтернативой и пояснение ИИ.
-- **Заявка**: оставить контакт после квиза → в Telegram метка (🔥 / 🟡 / ❄️), расчёт по прайсу,
-  резюме ИИ и «что делать»; в `/superadmin` — блок «Квалификация» и метка в таблице.
-- **Переключение моделей**: подставить заведомо битый `GEMINI_API_KEY` — ответ придёт
-  от Anthropic, в интерфейсе ни ошибки, ни заметной паузы; в логе одна строка об отключении.
-- **Мобильный профиль**: открыть сайт с телефона и убедиться, что `three` нет в сетевых запросах.
+| What | Where |
+|---|---|
+| Texts, services, prices, quiz steps | `frontend/src/site.config.ts` |
+| Assistant knowledge base (must match the site) | `backend/src/services/knowledgeBase.ts` |
+| Format matching and lead qualification | `backend/src/services/qualification.ts` |
+| Assistant prompts | `backend/src/services/systemPrompt.ts` |
+| Model chain | `backend/src/services/llm/` |
+| 3D scene | `frontend/src/three/` |
+
+---
+
+## O'zbekcha
+
+> O'quv loyihasi.
+
+Veb-dasturlash studiyasi uchun sotuvchi landing sahifa, unga sun'iy intellekt yordamchisi o'rnatilgan.
+Yordamchi xizmatlar haqidagi savollarga javob beradi, qisqa kviz o'tkazadi, taxminiy narx bilan mos formatni
+tavsiya qiladi va arizani saralaydi. Arizalar yashirin boshqaruv paneliga va Telegramga tushadi.
+
+### Imkoniyatlar
+
+- **AI-kviz** — beshta savol; format, byudjet va muddatga moslik kodda narxlar ro'yxati bo'yicha hisoblanadi,
+  AI esa tavsiyani ikki qisqa xatboshida tushuntiradi.
+- **AI-chat** — bilimlar bazasidan javob beradi. Modellar zanjiri (Gemini → Claude → tayyor javoblar)
+  limit yoki xatolikda darhol almashadi, shuning uchun tashrif buyuruvchi xatoni ko'rmaydi.
+- **Arizani saralash** — issiq / iliq / sovuq belgisi, menejer uchun AI xulosasi va keyingi qadam.
+- **Telegram** — «Ishga olish» tugmasi bilan tezkor bildirishnomalar (lokalda long polling, Vercel'da webhook).
+- **Boshqaruv paneli** `/superadmin` manzilida — parol bilan kirish, statistika, filtrlar, suhbatlar tarixi,
+  CSV eksport.
+- **3D fon** bitta WebGL canvas'da; telefonlarda three.js yuklanmaydi.
+- **Spamdan himoya** — honeypot maydoni, minimal to'ldirish vaqti, so'rovlar chegarasi.
+
+### Texnologiyalar
+
+React 18 · Vite · TypeScript · Tailwind CSS · three.js / React Three Fiber · Express · Gemini va Claude API ·
+Upstash Redis · Vercel
+
+### Tezkor ishga tushirish
+
+Node 20+ talab qilinadi.
+
+```bash
+cd backend && npm install && cp .env.example .env && npm run dev
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Sayt http://localhost:5173 manzilida, API esa `:3001` portida ishlaydi (Vite `/api` so'rovlarini proksilaydi).
+Sayt API kalitlarisiz ham ishlaydi: yordamchi tayyor javoblardan foydalanadi, arizalar `backend/data/*.json`
+fayllariga yoziladi.
+
+Commit oldidan tekshirish:
+
+```bash
+cd backend && npm run typecheck && cd ../frontend && npm run build
+```
+
+### Sozlash
+
+Barcha sozlamalar `backend/.env` faylida (izohlar bilan namuna — `.env.example`).
+
+| O'zgaruvchi | Vazifasi |
+|---|---|
+| `GEMINI_API_KEY`, `GEMINI_MODELS` | Gemini kaliti va modellar zanjiri (tartib = ustuvorlik) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | ixtiyoriy zaxira — Claude |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | bot tokeni va chat ID'lari (vergul bilan) |
+| `TELEGRAM_ENABLE_POLLING` | lokalda «Ishga olish» tugmasi |
+| `TELEGRAM_WEBHOOK_SECRET` | Vercel'dagi webhook siri |
+| `ADMIN_PASSWORD`, `ADMIN_SECRET` | panelga kirish va sessiyani imzolash |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` yoki `KV_REST_API_URL` / `_TOKEN` | Vercel'dagi ma'lumotlar ombori |
+
+### Vercel'ga joylashtirish
+
+Repozitoriy **ikkita Vercel loyihasi** sifatida joylashtiriladi, chunki Vercel loyihasi o'z asosiy papkasidan
+tashqaridagi fayllarni ko'rmaydi.
+
+1. **API** — Root Directory `backend`, loyiha nomi `biz-landing-api`. **Upstash Redis**ni ulang
+   (Storage, custom prefix `KV`), yuqoridagi o'zgaruvchilarni hamda sayt domeniga ishora qiluvchi
+   `FRONTEND_ORIGIN` va `PUBLIC_ADMIN_URL`ni qo'shing, so'ng qayta deploy qiling.
+2. **Sayt** — Root Directory `frontend`. `frontend/vercel.json` `/api` so'rovlarini API loyihasiga yo'naltiradi;
+   API loyihasining nomi boshqacha bo'lsa, manzilni o'sha faylda o'zgartiring.
+3. Telegram webhook'ini bir marta ro'yxatdan o'tkazing:
+
+```text
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://biz-landing-api.vercel.app/api/telegram/webhook&secret_token=<SECRET>&allowed_updates=%5B%22callback_query%22%5D
+```
+
+Shundan so'ng lokalda `TELEGRAM_ENABLE_POLLING=false` qo'ying yoki ishlab chiqish uchun alohida bot ishlating.
+
+### Loyiha tuzilmasi
+
+| Nima | Qayerda |
+|---|---|
+| Matnlar, xizmatlar, narxlar, kviz qadamlari | `frontend/src/site.config.ts` |
+| Yordamchining bilimlar bazasi (sayt bilan mos bo'lishi shart) | `backend/src/services/knowledgeBase.ts` |
+| Formatni tanlash va arizani saralash | `backend/src/services/qualification.ts` |
+| Yordamchi promptlari | `backend/src/services/systemPrompt.ts` |
+| Modellar zanjiri | `backend/src/services/llm/` |
+| 3D sahna | `frontend/src/three/` |
+
+---
+
+## Русский
+
+> Учебный проект.
+
+Продающий лендинг студии веб-разработки со встроенным ИИ-помощником. Помощник отвечает на вопросы об услугах,
+проводит короткий квиз, рекомендует формат с ориентиром по цене и квалифицирует заявку. Заявки попадают
+в скрытую админку и в Telegram.
+
+### Возможности
+
+- **ИИ-квиз** — пять вопросов; формат, соответствие бюджету и срокам считает код по прайсу,
+  а ИИ объясняет рекомендацию в двух коротких абзацах.
+- **ИИ-чат** — отвечает по базе знаний. Цепочка моделей (Gemini → Claude → заготовленные ответы) мгновенно
+  переключается при лимитах и ошибках, поэтому посетитель не видит ошибок.
+- **Квалификация заявки** — метка «горячая / тёплая / холодная», выжимка ИИ и следующий шаг для менеджера.
+- **Telegram** — мгновенные уведомления с кнопкой «Взять в работу» (локально long polling, на Vercel вебхук).
+- **Админка** по адресу `/superadmin` — вход по паролю, статистика, фильтры, история диалогов, экспорт в CSV.
+- **3D-фон** на одном WebGL-canvas; на телефонах three.js не загружается.
+- **Антиспам** — поле-ловушка, минимальное время заполнения, ограничение частоты запросов.
+
+### Стек
+
+React 18 · Vite · TypeScript · Tailwind CSS · three.js / React Three Fiber · Express · Gemini и Claude API ·
+Upstash Redis · Vercel
+
+### Быстрый старт
+
+Нужен Node 20+.
+
+```bash
+cd backend && npm install && cp .env.example .env && npm run dev
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Сайт открывается на http://localhost:5173, API работает на `:3001` (Vite проксирует `/api`). Сайт работает
+и без API-ключей: помощник отвечает заготовками, заявки сохраняются в `backend/data/*.json`.
+
+Проверка перед коммитом:
+
+```bash
+cd backend && npm run typecheck && cd ../frontend && npm run build
+```
+
+### Настройка
+
+Все настройки — в `backend/.env` (образец с комментариями — `.env.example`).
+
+| Переменная | Назначение |
+|---|---|
+| `GEMINI_API_KEY`, `GEMINI_MODELS` | ключ Gemini и цепочка моделей (порядок = приоритет) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | необязательный запасной вариант — Claude |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | токен бота и ID чатов (через запятую) |
+| `TELEGRAM_ENABLE_POLLING` | кнопка «Взять в работу» на localhost |
+| `TELEGRAM_WEBHOOK_SECRET` | секрет вебхука на Vercel |
+| `ADMIN_PASSWORD`, `ADMIN_SECRET` | вход в админку и подпись сессии |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` или `KV_REST_API_URL` / `_TOKEN` | хранилище на Vercel |
+
+### Деплой на Vercel
+
+Репозиторий подключается **двумя проектами Vercel**: проект Vercel не видит файлы вне своей корневой папки.
+
+1. **API** — Root Directory `backend`, имя проекта `biz-landing-api`. Подключите **Upstash Redis**
+   (Storage, custom prefix `KV`), добавьте переменные из таблицы, а также `FRONTEND_ORIGIN` и `PUBLIC_ADMIN_URL`
+   с доменом сайта, затем сделайте Redeploy.
+2. **Сайт** — Root Directory `frontend`. `frontend/vercel.json` проксирует `/api` на проект API;
+   если имя проекта API другое, поправьте адрес в этом файле.
+3. Один раз зарегистрируйте вебхук Telegram:
+
+```text
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://biz-landing-api.vercel.app/api/telegram/webhook&secret_token=<SECRET>&allowed_updates=%5B%22callback_query%22%5D
+```
+
+После этого локально поставьте `TELEGRAM_ENABLE_POLLING=false` или используйте для разработки отдельного бота.
+
+### Структура проекта
+
+| Что | Где |
+|---|---|
+| Тексты, услуги, цены, шаги квиза | `frontend/src/site.config.ts` |
+| База знаний помощника (должна совпадать с сайтом) | `backend/src/services/knowledgeBase.ts` |
+| Подбор формата и квалификация заявки | `backend/src/services/qualification.ts` |
+| Промпты помощника | `backend/src/services/systemPrompt.ts` |
+| Цепочка моделей | `backend/src/services/llm/` |
+| 3D-сцена | `frontend/src/three/` |
