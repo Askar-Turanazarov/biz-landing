@@ -6,7 +6,16 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-export class JsonStore<T> {
+/** Общий контракт хранилищ: JSON-файлы локально и Upstash Redis на Vercel. */
+export interface Store<T> {
+  all(): Promise<T[]>;
+  insert(item: T): Promise<T>;
+  update(match: (item: T) => boolean, patch: Partial<T>): Promise<T | null>;
+  upsert(match: (item: T) => boolean, create: () => T, patch?: Partial<T>): Promise<T>;
+  remove(match: (item: T) => boolean): Promise<boolean>;
+}
+
+export class JsonStore<T> implements Store<T> {
   private items: T[] = [];
   private ready: Promise<void>;
   /** Хвост очереди записи: каждая новая запись встаёт за предыдущей. */

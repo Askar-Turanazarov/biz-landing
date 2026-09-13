@@ -4,6 +4,7 @@ import { createLead } from '../services/leadStore.js';
 import { linkLead, getSession } from '../services/sessionStore.js';
 import { normalizeQuizAnswers } from '../services/qualification.js';
 import { processLead } from '../services/leadProcessing.js';
+import { runInBackground } from '../services/background.js';
 import { rateLimit, clientIp } from '../middleware/rateLimit.js';
 import { asyncRoute } from '../middleware/asyncRoute.js';
 import type { ContactType, LeadSource } from '../types.js';
@@ -108,8 +109,6 @@ leadsRouter.post(
 
     // Отвечаем сразу: ни модель, ни Telegram не должны задерживать или ломать приём заявки.
     res.status(201).json({ ok: true, id: lead.id });
-    void processLead(lead, session?.messages ?? []).catch((error) =>
-      console.error('[lead] фоновая обработка:', (error as Error).message),
-    );
+    runInBackground(processLead(lead, session?.messages ?? []), 'lead');
   }),
 );

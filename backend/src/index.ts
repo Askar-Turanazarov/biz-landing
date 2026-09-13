@@ -9,7 +9,9 @@ import { config, reportConfig } from './config.js';
 import { leadsRouter } from './routes/leads.js';
 import { chatRouter } from './routes/chat.js';
 import { adminRouter } from './routes/admin.js';
+import { telegramRouter } from './routes/telegram.js';
 import { chainStatus } from './services/llm/index.js';
+import { storageKind } from './services/store.js';
 import { startPolling } from './services/telegram.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -25,14 +27,22 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     llm: chainStatus(),
     telegram: config.telegram.enabled ? 'настроен' : 'отключён',
+    telegramButtons: config.telegram.webhookSecret
+      ? 'вебхук'
+      : config.telegram.enablePolling
+        ? 'polling'
+        : 'выключены',
+    storage: storageKind(),
   });
 });
 
 app.use('/api', leadsRouter);
 app.use('/api', chatRouter);
+app.use('/api', telegramRouter);
 app.use('/api', adminRouter);
 
-// В проде отдаём собранный фронтенд отсюда же: одна команда — один процесс.
+// Локальная прод-сборка: отдаём собранный фронтенд отсюда же. На Vercel фронтенд —
+// отдельный проект, и эта ветка не срабатывает.
 const frontendDist = resolve(here, '../../frontend/dist');
 if (existsSync(frontendDist)) {
   app.use(express.static(frontendDist));

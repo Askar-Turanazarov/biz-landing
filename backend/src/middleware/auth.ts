@@ -13,8 +13,8 @@ function sign(payload: string): string {
   return createHmac('sha256', config.admin.secret).update(payload).digest('hex');
 }
 
-/** Сравнение постоянного времени: защищает и пароль, и подпись токена. */
-function safeEqual(a: string, b: string): boolean {
+/** Сравнение постоянного времени: защищает пароль, подпись токена и секрет вебхука. */
+export function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
   if (bufA.length !== bufB.length) return false;

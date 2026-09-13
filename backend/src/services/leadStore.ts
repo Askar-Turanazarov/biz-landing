@@ -1,14 +1,9 @@
-/** Заявки: создание, фильтрация, статистика. Файл — backend/data/leads.json. */
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+/** Заявки: создание, фильтрация, статистика. Локально — backend/data/leads.json, на Vercel — Upstash. */
 import { randomUUID } from 'node:crypto';
-import { JsonStore } from './jsonStore.js';
+import { createStore } from './store.js';
 import type { Lead, LeadStatus, QuizAnswer, ContactType, LeadSource } from '../types.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const dataDir = resolve(here, '../../data');
-
-const store = new JsonStore<Lead>(resolve(dataDir, 'leads.json'));
+const store = createStore<Lead>('leads');
 
 export interface NewLeadInput {
   name: string;

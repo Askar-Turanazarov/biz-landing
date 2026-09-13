@@ -1,11 +1,9 @@
-/** Диалоги посетителей с ассистентом. Файл — backend/data/sessions.json. */
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { JsonStore } from './jsonStore.js';
+/** Диалоги посетителей с ассистентом. Локально — backend/data/sessions.json, на Vercel — Upstash. */
+import { createStore } from './store.js';
 import type { ChatMessage, QuizAnswer, Session } from '../types.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const store = new JsonStore<Session>(resolve(here, '../../data/sessions.json'));
+/** В Redis весь список лежит одним значением, поэтому храним только последние диалоги. */
+const store = createStore<Session>('sessions', { maxItems: 100 });
 
 /** Длиннее хранить незачем: контекст ассистента и так режется до последних сообщений. */
 const MAX_MESSAGES_PER_SESSION = 60;
