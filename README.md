@@ -106,6 +106,7 @@ ADMIN_SECRET=длинная-случайная-строка
 | Тексты, услуги, цены, отзывы, FAQ, шаги квиза | `frontend/src/site.config.ts` |
 | Курс доллара и формат цен | `frontend/src/lib/price.ts` |
 | Знания ассистента (должны совпадать с сайтом) | `backend/src/services/knowledgeBase.ts` |
+| Правила подбора формата и метки заявки | `backend/src/services/qualification.ts` |
 | Характер и правила ассистента | `backend/src/services/systemPrompt.ts` |
 | Палитра, шрифты, брейкпоинты | `frontend/tailwind.config.ts` |
 | 3D-сцена | `frontend/src/three/` |
@@ -148,10 +149,60 @@ cd frontend && npm run build
 После `npm run build` во фронтенде backend начинает раздавать `frontend/dist` сам —
 можно проверить прод-сборку целиком на `http://localhost:3001` (нужен перезапуск backend).
 
+## Деплой на Vercel (бесплатно)
+
+Проект Vercel не видит файлы вне своей корневой папки, поэтому репозиторий подключается
+**двумя проектами**: API (`backend`) и сайт (`frontend`). Сайт проксирует `/api/*` на API-проект
+через `frontend/vercel.json` — браузер ходит на один домен, и cookie админки работают.
+
+Тариф Hobby бесплатный, но только для некоммерческого использования: для учебного демо подходит,
+для реального клиента нужен Pro.
+
+### 1. Проект API
+
+1. Vercel → **Add New… → Project** → импорт репозитория, **Root Directory: `backend`**,
+   имя проекта `biz-landing-api`. Express Vercel определит сам по `src/index.ts`.
+2. **Storage → Upstash Redis** (бесплатный план) → подключить к проекту. Переменные хранилища
+   Vercel добавит сам. Без них заявки на Vercel не сохраняются между запросами.
+3. **Settings → Environment Variables**:
+
+| Переменная | Значение |
+|---|---|
+| `GEMINI_API_KEY`, `GEMINI_MODELS` | как в локальном `.env` |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | как в локальном `.env` |
+| `TELEGRAM_WEBHOOK_SECRET` | случайная строка: латиница, цифры, `_`, `-` |
+| `ADMIN_PASSWORD` | новый длинный пароль |
+| `ADMIN_SECRET` | новая длинная случайная строка |
+| `FRONTEND_ORIGIN` | `https://biz-landing.vercel.app` |
+| `PUBLIC_ADMIN_URL` | `https://biz-landing.vercel.app/superadmin` |
+
+4. **Deployments → Redeploy**, чтобы переменные подхватились. Проверка:
+   `https://biz-landing-api.vercel.app/api/health` — в ответе `"storage": "upstash"`
+   и `"telegramButtons": "вебхук"`.
+
+### 2. Проект сайта
+
+1. Ещё раз **Add New… → Project** → тот же репозиторий, **Root Directory: `frontend`**,
+   имя `biz-landing`. Vercel определит Vite, переменные окружения не нужны.
+2. Если имя API-проекта получилось другим, поправьте адрес в `frontend/vercel.json` и запушьте.
+
+### 3. Кнопка «Взять в работу» (вебхук)
+
+Один раз откройте в браузере, подставив токен бота и секрет вебхука:
+
+```text
+https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=https://biz-landing-api.vercel.app/api/telegram/webhook&secret_token=<СЕКРЕТ>&allowed_updates=%5B%22callback_query%22%5D
+```
+
+Ответ `"ok":true` — готово. После этого long polling этого же бота на localhost будет получать
+ошибку 409: для локальной разработки заведите второго бота или поставьте `TELEGRAM_ENABLE_POLLING=false`.
+
 ## Проверка ключевых сценариев
 
-- **Заявка**: пройти квиз → оставить контакт → заявка в `backend/data/leads.json`,
-  в Telegram-группе и в `/superadmin` вместе с ответами квиза и транскриптом диалога.
+- **Квиз**: пройти пять вопросов → карточка «Вам подойдёт» с форматом, ценой и сроком;
+  если бюджета не хватает — строка с альтернативой и пояснение ИИ.
+- **Заявка**: оставить контакт после квиза → в Telegram метка (🔥 / 🟡 / ❄️), расчёт по прайсу,
+  резюме ИИ и «что делать»; в `/superadmin` — блок «Квалификация» и метка в таблице.
 - **Переключение моделей**: подставить заведомо битый `GEMINI_API_KEY` — ответ придёт
   от Anthropic, в интерфейсе ни ошибки, ни заметной паузы; в логе одна строка об отключении.
 - **Мобильный профиль**: открыть сайт с телефона и убедиться, что `three` нет в сетевых запросах.
