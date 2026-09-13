@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { assistant, legal } from '../site.config';
 import { useAssistantStore } from './useAssistantStore';
+import { QuizResultCard } from './QuizResultCard';
 import { Button } from '../components/ui/Button';
 import { ConsentCheckbox, Field, HoneypotField } from '../components/ui/Field';
 import { emptyLeadForm, useLeadSubmit, type LeadFormValues } from '../hooks/useLeadSubmit';
 
 /**
  * Финальный шаг обеих веток помощника — квиза и свободного чата.
- * Ответы квиза уезжают вместе с заявкой, поэтому менеджер сразу видит контекст.
+ * После квиза сверху итог подбора, ответы уезжают вместе с заявкой — менеджер сразу видит контекст.
  */
 export function ContactView() {
-  const { quizAnswers, quizIndex, finish, setMode, goBackQuiz } = useAssistantStore();
+  const { quizAnswers, quizIndex, quizResult, quizResultStatus, finish, setMode, goBackQuiz } =
+    useAssistantStore();
   const [values, setValues] = useState<LeadFormValues>(emptyLeadForm);
 
   const fromQuiz = quizAnswers.length > 0;
@@ -30,23 +32,29 @@ export function ContactView() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="scroll-thin flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-      <div>
-        <h3 className="font-display text-lg font-bold text-white">
-          {fromQuiz ? 'Подбор готов' : 'Оставьте контакт'}
-        </h3>
-        <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{assistant.contactIntro}</p>
-      </div>
+      <h3 className="font-display text-lg font-bold text-white">
+        {fromQuiz ? 'Подбор готов' : 'Оставьте контакт'}
+      </h3>
+
+      {fromQuiz && <QuizResultCard status={quizResultStatus} result={quizResult} />}
 
       {fromQuiz && (
-        <ul className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-          {quizAnswers.map((answer) => (
-            <li key={answer.stepId} className="flex gap-2 text-xs">
-              <span className="shrink-0 text-slate-500">{answer.question}</span>
-              <span className="ml-auto text-right font-medium text-slate-200">{answer.answer}</span>
-            </li>
-          ))}
-        </ul>
+        <details className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+          <summary className="cursor-pointer text-xs text-slate-400 transition-colors hover:text-slate-200">
+            Ваши ответы
+          </summary>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {quizAnswers.map((answer) => (
+              <li key={answer.stepId} className="flex gap-2 text-xs">
+                <span className="shrink-0 text-slate-500">{answer.question}</span>
+                <span className="ml-auto text-right font-medium text-slate-200">{answer.answer}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
+
+      <p className="text-sm leading-relaxed text-slate-400">{assistant.contactIntro}</p>
 
       <HoneypotField value={values.company} onChange={(e) => set('company', e.target.value)} />
 

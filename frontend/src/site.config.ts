@@ -364,12 +364,21 @@ export const faq = [
   },
 ];
 
-/** Шаги квиза. Варианты — кнопки, поэтому шаг переключается мгновенно, без обращения к ИИ. */
+/**
+ * Шаги квиза. Варианты — кнопки, поэтому шаг переключается мгновенно, без обращения к ИИ.
+ * value — машинный код для расчёта на сервере: коды и бюджетные границы обязаны совпадать
+ * с QUIZ_CODES и BUDGET_MAX в backend/src/services/knowledgeBase.ts.
+ */
+export interface QuizOption {
+  value: string;
+  label: string;
+}
+
 export interface QuizStep {
   id: string;
   question: string;
   hint?: string;
-  options: string[];
+  options: QuizOption[];
 }
 
 export const quizSteps: QuizStep[] = [
@@ -378,39 +387,54 @@ export const quizSteps: QuizStep[] = [
     question: 'Что нужно сделать?',
     hint: 'Выберите ближайший вариант — детали уточним на брифе',
     options: [
-      'Продающий лендинг',
-      'Корпоративный сайт',
-      'Интернет-магазин',
-      'Веб-сервис или кабинет',
-      'Пока не определился',
+      { value: 'landing', label: 'Продающий лендинг' },
+      { value: 'corporate', label: 'Корпоративный сайт' },
+      { value: 'ecommerce', label: 'Интернет-магазин' },
+      { value: 'webapp', label: 'Веб-сервис или кабинет' },
+      { value: 'unsure', label: 'Пока не определился' },
     ],
   },
   {
     id: 'state',
     question: 'Что уже есть?',
-    options: ['Ничего, начинаем с нуля', 'Есть логотип и брендбук', 'Есть старый сайт', 'Есть макеты в Figma'],
+    options: [
+      { value: 'scratch', label: 'Ничего, начинаем с нуля' },
+      { value: 'brand', label: 'Есть логотип и брендбук' },
+      { value: 'old_site', label: 'Есть старый сайт' },
+      { value: 'figma', label: 'Есть макеты в Figma' },
+    ],
   },
   {
     id: 'deadline',
     question: 'Когда нужен результат?',
-    options: ['Срочно, горит', 'В течение месяца', 'Через 2–3 месяца', 'Сроки не критичны'],
+    options: [
+      { value: 'urgent', label: 'Срочно, горит' },
+      { value: 'month', label: 'В течение месяца' },
+      { value: 'quarter', label: 'Через 2–3 месяца' },
+      { value: 'flexible', label: 'Сроки не критичны' },
+    ],
   },
   {
     id: 'budget',
     question: 'На какой бюджет ориентируетесь?',
     hint: 'Поможет сразу предложить подходящий формат',
     options: [
-      `До ${formatSum(25_000_000)}`,
-      `${formatSumRange(25_000_000, 60_000_000)}`,
-      `${formatSumRange(60_000_000, 150_000_000)}`,
-      `Более ${formatSum(150_000_000)}`,
-      'Нужен ориентир от вас',
+      { value: 'lt25', label: `До ${formatSum(25_000_000)}` },
+      { value: '25_60', label: formatSumRange(25_000_000, 60_000_000) },
+      { value: '60_150', label: formatSumRange(60_000_000, 150_000_000) },
+      { value: 'gt150', label: `Более ${formatSum(150_000_000)}` },
+      { value: 'unknown', label: 'Нужен ориентир от вас' },
     ],
   },
   {
     id: 'goal',
     question: 'Главная цель сайта?',
-    options: ['Собирать заявки', 'Продавать онлайн', 'Показать экспертизу', 'Автоматизировать процессы'],
+    options: [
+      { value: 'leads', label: 'Собирать заявки' },
+      { value: 'sales', label: 'Продавать онлайн' },
+      { value: 'expertise', label: 'Показать экспертизу' },
+      { value: 'automation', label: 'Автоматизировать процессы' },
+    ],
   },
 ];
 

@@ -4,6 +4,7 @@
  * Посетитель в любом случае получает осмысленный ответ, а не ошибку.
  */
 import { FAQ, SERVICES, COMPANY, PROCESS, priceLabel, USD_RATE } from '../knowledgeBase.js';
+import type { QuizMatch } from '../../types.js';
 
 interface Rule {
   test: RegExp;
@@ -92,4 +93,30 @@ export function mockAnswer(userText: string): string {
 
 export function mockQuizComment(answer: string): string {
   return `Понял: ${answer.toLowerCase()}. Учтём это при расчёте сметы.`;
+}
+
+/** Итог квиза без модели: тот же расчёт, только шаблонным текстом. */
+export function mockQuizResult(match: QuizMatch): string {
+  const { service, alternative } = match;
+  const parts = [
+    match.inferred
+      ? `По вашим ответам лучше всего подходит ${service.title.toLowerCase()}: он закрывает главную цель без лишних затрат.`
+      : `${service.title} — хороший выбор под вашу задачу, срок ${service.duration}.`,
+  ];
+  if (alternative) {
+    parts.push(
+      `Чтобы уложиться в бюджет, можно начать с формата «${alternative.title}» и добавить остальное вторым этапом.`,
+    );
+  } else if (match.budgetFit === 'close') {
+    parts.push('Бюджет близок к стартовой цене — обсудим объём первого этапа.');
+  }
+  if (match.deadlineFit === 'tight') {
+    parts.push('Срок сжатый — предложим запуск по этапам, чтобы главное заработало быстрее.');
+  }
+  return parts.join(' ');
+}
+
+/** Выжимка для менеджера без модели: пометки расчёта одной строкой. */
+export function mockLeadSummary(match: QuizMatch): string {
+  return [`Подходит: ${match.service.title}, ${priceLabel(match.service.priceFrom)}.`, ...match.flags].join(' ');
 }

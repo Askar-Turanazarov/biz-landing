@@ -104,6 +104,76 @@ export const SERVICES: ServiceInfo[] = [
   },
 ];
 
+export function serviceById(id: string): ServiceInfo | undefined {
+  return SERVICES.find((service) => service.id === id);
+}
+
+/**
+ * Минимальный срок услуги в неделях — для сравнения со сроком клиента.
+ * Строка duration в SERVICES написана для людей, считать по ней нельзя.
+ */
+export const MIN_WEEKS: Record<string, number> = {
+  landing: 3,
+  corporate: 6,
+  ecommerce: 10,
+  webapp: 12,
+  ai: 2,
+  redesign: 3,
+};
+
+/**
+ * Коды вариантов квиза. Подписи живут во frontend/src/site.config.ts (quizSteps),
+ * смысл кодов — здесь. Наборы обязаны совпадать: неизвестный код в расчёт не попадёт.
+ */
+export const QUIZ_CODES = {
+  type: ['landing', 'corporate', 'ecommerce', 'webapp', 'unsure'],
+  state: ['scratch', 'brand', 'old_site', 'figma'],
+  deadline: ['urgent', 'month', 'quarter', 'flexible'],
+  budget: ['lt25', '25_60', '60_150', 'gt150', 'unknown'],
+  goal: ['leads', 'sales', 'expertise', 'automation'],
+} as const;
+
+/**
+ * Верхняя граница бюджетных вилок квиза в сумах; null — посетитель просит ориентир.
+ * Числа совпадают с подписями вариантов на фронтенде.
+ */
+export const BUDGET_MAX: Record<string, number | null> = {
+  lt25: 25_000_000,
+  '25_60': 60_000_000,
+  '60_150': 150_000_000,
+  gt150: Number.POSITIVE_INFINITY,
+  unknown: null,
+};
+
+/** Сколько недель у клиента есть на запуск. */
+export const DEADLINE_WEEKS: Record<string, number> = {
+  urgent: 2,
+  month: 4,
+  quarter: 13,
+  flexible: Number.POSITIVE_INFINITY,
+};
+
+/** Если формат не выбран, подбираем его по главной цели сайта. */
+export const GOAL_TO_SERVICE: Record<string, string> = {
+  leads: 'landing',
+  sales: 'ecommerce',
+  expertise: 'corporate',
+  automation: 'webapp',
+};
+
+/** С чего начать, если бюджет ниже нужного формата. Порядок — от дешёвого к дорогому. */
+export const STARTER_SERVICES = ['landing', 'corporate'];
+
+/** Как подбирать формат по задаче. Одна логика для чата (через промпт) и для квиза. */
+export const SELECTION_GUIDE: { when: string; serviceId: string }[] = [
+  { when: 'нужно собирать заявки на один продукт или услугу', serviceId: 'landing' },
+  { when: 'нужно показать компанию, несколько направлений и экспертизу', serviceId: 'corporate' },
+  { when: 'нужно продавать онлайн: каталог, корзина, оплата', serviceId: 'ecommerce' },
+  { when: 'нужно автоматизировать процессы, личные кабинеты или MVP продукта', serviceId: 'webapp' },
+  { when: 'сайт уже есть, но устарел, медленный или плохо приносит заявки', serviceId: 'redesign' },
+  { when: 'сайт есть, а нужен ИИ-консультант и квалификация заявок', serviceId: 'ai' },
+];
+
 export const PROCESS = [
   { step: 1, title: 'Бриф и аналитика', duration: '3–5 дней', text: 'Разбираем задачу, изучаем конкурентов, фиксируем цели и метрики.' },
   { step: 2, title: 'Прототип и дизайн', duration: '1–3 недели', text: 'Собираем структуру, показываем кликабельный прототип, рисуем макеты.' },
@@ -172,6 +242,16 @@ export function knowledgeSummary(): string {
   ).join('\n');
   const process = PROCESS.map((p) => `${p.step}. ${p.title} (${p.duration}) — ${p.text}`).join('\n');
   const faq = FAQ.map((f) => `В: ${f.q}\nО: ${f.a}`).join('\n');
+  const guide = SELECTION_GUIDE.map((g) => {
+    const s = serviceById(g.serviceId);
+    return s ? `- Если ${g.when} → ${s.title} (${priceLabel(s.priceFrom)}, ${s.duration}).` : '';
+  })
+    .filter(Boolean)
+    .join('\n');
+  const starters = STARTER_SERVICES.map((id) => serviceById(id))
+    .map((s) => (s ? `${s.title.toLowerCase()} ${priceLabel(s.priceFrom)}` : ''))
+    .filter(Boolean)
+    .join(' или ');
 
   return `КОМПАНИЯ
 ${COMPANY.name} — ${COMPANY.tagline}. На рынке с ${COMPANY.since} года, команда ${COMPANY.team} человек, ${COMPANY.projects}+ проектов.
@@ -185,6 +265,11 @@ ${COMPANY.city}. График: ${COMPANY.workHours}.
 
 УСЛУГИ И ЦЕНЫ
 ${services}
+
+ПОДБОР ФОРМАТА
+${guide}
+- Если бюджет ниже стартовой цены нужного формата — честно назови цену и предложи начать с меньшего: ${starters}, а остальное добавить вторым этапом.
+- Если нужный срок короче обычного — назови обычный срок и предложи запуск по этапам: сначала ключевые страницы и функции.
 
 ЭТАПЫ РАБОТЫ
 ${process}

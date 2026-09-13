@@ -43,6 +43,7 @@ export async function createLead(input: NewLeadInput): Promise<Lead> {
     ip: input.ip ?? '',
     telegramStatus: 'pending',
     telegramMessageId: null,
+    qualification: null,
   };
   return store.insert(lead);
 }

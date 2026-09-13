@@ -16,7 +16,7 @@ export function QuizView() {
 
   if (!step) return null;
 
-  const previousAnswer = quizAnswers.find((a) => a.stepId === step.id)?.answer;
+  const previousValue = quizAnswers.find((a) => a.stepId === step.id)?.value;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -47,17 +47,17 @@ export function QuizView() {
           <div className="mt-4 flex flex-col gap-2">
             {step.options.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 onClick={() => answerQuiz(option)}
                 className={`focus-ring group flex items-center justify-between gap-3 rounded-2xl
                             border px-4 py-3 text-left text-sm transition-colors
                             ${
-                              previousAnswer === option
+                              previousValue === option.value
                                 ? 'border-accent-cyan/50 bg-accent-soft text-white'
                                 : 'border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/25 hover:bg-white/[0.07]'
                             }`}
               >
-                {option}
+                {option.label}
                 <ArrowRight
                   className="h-4 w-4 shrink-0 text-slate-600 transition-transform
                              duration-200 group-hover:translate-x-0.5 group-hover:text-accent-cyan"

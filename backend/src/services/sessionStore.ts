@@ -34,12 +34,15 @@ export async function appendMessages(id: string, messages: ChatMessage[]): Promi
   return updated ?? session;
 }
 
-/** Ответ на шаг квиза перезаписывается, если посетитель вернулся назад и передумал. */
-export async function recordQuizAnswer(id: string, answer: QuizAnswer): Promise<Session> {
+/**
+ * Ответы на шаги квиза перезаписываются по stepId: посетитель мог вернуться назад и передумать.
+ * Итог квиза присылает все ответы разом — они ложатся одной записью.
+ */
+export async function recordQuizAnswers(id: string, answers: QuizAnswer[]): Promise<Session> {
   const session = await ensureSession(id);
-  const rest = session.quizAnswers.filter((a) => a.stepId !== answer.stepId);
+  const replaced = new Set(answers.map((a) => a.stepId));
   const updated = await store.update((s) => s.id === id, {
-    quizAnswers: [...rest, answer],
+    quizAnswers: [...session.quizAnswers.filter((a) => !replaced.has(a.stepId)), ...answers],
     updatedAt: new Date().toISOString(),
   });
   return updated ?? session;

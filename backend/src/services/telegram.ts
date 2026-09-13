@@ -1,14 +1,14 @@
 /**
  * Уведомления в группу отдела продаж через Bot API.
- * Библиотека не нужна — это два fetch-запроса.
+ * Библиотека не нужна — это несколько fetch-запросов.
  *
  * Настройка: создать бота у @BotFather, добавить его в группу, написать туда
  * любое сообщение и взять chat.id из https://api.telegram.org/bot<TOKEN>/getUpdates
  */
 import { config } from '../config.js';
 import { getLead, updateLead } from './leadStore.js';
-import { TIMEZONE } from './knowledgeBase.js';
-import type { Lead } from '../types.js';
+import { TIMEZONE, priceLabel } from './knowledgeBase.js';
+import type { BudgetFit, DeadlineFit, Lead, LeadTemperature } from '../types.js';
 
 const API = (method: string) => `https://api.telegram.org/bot${config.telegram.botToken}/${method}`;
 
@@ -24,6 +24,28 @@ const STATUS_LABEL: Record<Lead['status'], string> = {
   won: 'Успех',
   lost: 'Отказ',
 };
+
+const TEMPERATURE_TITLE: Record<LeadTemperature, string> = {
+  hot: '🔥 Горячая заявка',
+  warm: '🟡 Тёплая заявка',
+  cold: '❄️ Холодная заявка',
+};
+
+const BUDGET_LABEL: Record<BudgetFit, string> = {
+  ok: '✅ укладывается',
+  close: '≈ у нижней границы',
+  low: '❌ ниже стартовой цены',
+  unknown: '❔ не назван',
+};
+
+const DEADLINE_LABEL: Record<DeadlineFit, string> = {
+  ok: '✅ реалистичный',
+  tight: '⚠️ жёсткий',
+  unknown: '❔ не указан',
+};
+
+/** Повтор отправки тем чатам, что не приняли сообщение с первого раза. */
+const RETRY_DELAY_MS = 30_000;
 
 /** Telegram ломается на сырых <, > и & в HTML-разметке. */
 function esc(value: string): string {
@@ -42,17 +64,43 @@ function contactLink(lead: Lead): string {
   }
 }
 
+/** Блок квалификации: расчёт по прайсу и выжимка ИИ. Текст модели экранируем, как и всё остальное. */
+function renderQualification(lead: Lead): string[] {
+  const q = lead.qualification;
+  if (!q || (!q.match && !q.summary)) return [];
+
+  const rows = ['', '<b>Квалификация</b>'];
+  const m = q.match;
+  if (m) {
+    rows.push(
+      `Подходит: ${esc(m.service.title)} — ${esc(priceLabel(m.service.priceFrom))}, ${esc(m.service.duration)}`,
+    );
+    if (m.inferred) rows.push('<i>Формат клиент не выбрал — подобран по цели.</i>');
+    rows.push(`Бюджет: ${BUDGET_LABEL[m.budgetFit]} · Срок: ${DEADLINE_LABEL[m.deadlineFit]}`);
+    if (m.alternative) {
+      rows.push(`Альтернатива: ${esc(m.alternative.title)} — ${esc(priceLabel(m.alternative.priceFrom))}`);
+    }
+  }
+  if (q.summary) rows.push(`<b>Резюме ИИ:</b> ${esc(q.summary)}`);
+  if (q.nextStep) rows.push(`<b>Что делать:</b> ${esc(q.nextStep)}`);
+  return rows;
+}
+
 function renderMessage(lead: Lead): string {
   // Время в сообщении — всегда по Ташкенту, независимо от TZ сервера.
   const when = new Date(lead.createdAt).toLocaleString('ru-RU', { timeZone: TIMEZONE });
+  const temperature = lead.qualification?.temperature;
+  const title = temperature ? TEMPERATURE_TITLE[temperature] : '🔔 Новая заявка';
   const rows = [
-    `<b>🔔 Новая заявка — ${esc(SOURCE_LABEL[lead.source])}</b>`,
+    `<b>${title} — ${esc(SOURCE_LABEL[lead.source])}</b>`,
     '',
     `<b>Имя:</b> ${esc(lead.name)}`,
     `<b>Контакт:</b> ${contactLink(lead)}`,
   ];
 
   if (lead.comment) rows.push(`<b>Комментарий:</b> ${esc(lead.comment)}`);
+
+  rows.push(...renderQualification(lead));
 
   if (lead.quizAnswers.length) {
     rows.push('', '<b>Ответы квиза:</b>');
@@ -101,12 +149,13 @@ function adminButton() {
     : [];
 }
 
+/** Кнопка «Взять в работу» есть, только если нажатия кто-то принимает: polling или вебхук. */
 function keyboard(lead: Lead) {
-  return {
-    inline_keyboard: [
-      [{ text: '✅ Взять в работу', callback_data: `take:${lead.id}` }, ...adminButton()],
-    ],
-  };
+  const take = config.telegram.acceptsCallbacks
+    ? [{ text: '✅ Взять в работу', callback_data: `take:${lead.id}` }]
+    : [];
+  const row = [...take, ...adminButton()];
+  return row.length ? { inline_keyboard: [row] } : undefined;
 }
 
 /** Сколько секунд Telegram держит соединение открытым в getUpdates. */
@@ -140,21 +189,28 @@ async function sendTo(chatId: string, lead: Lead): Promise<number | null> {
 }
 
 /**
- * Отправка «выстрелил и забыл»: вызывается ПОСЛЕ ответа клиенту.
- * Падение Telegram не должно ломать приём заявки — фиксируем статус и повторяем один раз.
+ * Отправка менеджерам. Вызывается ПОСЛЕ ответа клиенту: падение Telegram не должно
+ * ломать приём заявки.
  *
- * Получателей может быть несколько (группа + личка). Шлём во все параллельно и
- * повторяем только те чаты, что не приняли сообщение: успешные адресаты не должны
- * получить дубль из-за чужой ошибки.
+ * Получателей может быть несколько (группа + личка). Шлём во все параллельно, а через
+ * 30 с повторяем только тем чатам, что не приняли сообщение: успешные адресаты не должны
+ * получить дубль из-за чужой ошибки. Возвращает Promise, чтобы на Vercel его можно было
+ * отдать в waitUntil и функция не остановилась раньше времени.
  */
-export function notifyLead(lead: Lead, chatIds: string[] = config.telegram.chatIds, attempt = 1): void {
+export async function notifyLead(lead: Lead): Promise<void> {
   if (!config.telegram.enabled) {
-    void updateLead(lead.id, { telegramStatus: 'skipped' });
+    await updateLead(lead.id, { telegramStatus: 'skipped' });
     return;
   }
 
-  void (async () => {
-    const results = await Promise.allSettled(chatIds.map((chatId) => sendTo(chatId, lead)));
+  let pending = config.telegram.chatIds;
+  let delivered = false;
+
+  for (let attempt = 1; attempt <= 2 && pending.length; attempt += 1) {
+    if (attempt > 1) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+
+    const chats = pending;
+    const results = await Promise.allSettled(chats.map((chatId) => sendTo(chatId, lead)));
 
     const failed: string[] = [];
     const sent: string[] = [];
@@ -162,38 +218,84 @@ export function notifyLead(lead: Lead, chatIds: string[] = config.telegram.chatI
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
-        sent.push(chatIds[index]);
+        sent.push(chats[index]);
         firstMessageId ??= result.value;
         return;
       }
-      failed.push(chatIds[index]);
-      console.error(
-        `[telegram] чат ${chatIds[index]}, попытка ${attempt}: ${(result.reason as Error).message}`,
-      );
+      failed.push(chats[index]);
+      console.error(`[telegram] чат ${chats[index]}, попытка ${attempt}: ${(result.reason as Error).message}`);
     });
 
     // Явно пишем адресатов: иначе при нескольких чатах непонятно, куда заявка дошла.
-    if (sent.length) console.log(`[telegram] заявка ${lead.id} доставлена в: ${sent.join(', ')}`);
-
-    const delivered = failed.length < chatIds.length;
-    if (delivered && firstMessageId !== null) {
-      await updateLead(lead.id, { telegramStatus: 'sent', telegramMessageId: firstMessageId });
+    if (sent.length) {
+      console.log(`[telegram] заявка ${lead.id} доставлена в: ${sent.join(', ')}`);
+      if (!delivered) {
+        await updateLead(lead.id, { telegramStatus: 'sent', telegramMessageId: firstMessageId });
+      }
+      delivered = true;
     }
 
-    if (!failed.length) return;
+    pending = failed;
+  }
 
-    if (attempt === 1) {
-      setTimeout(() => notifyLead(lead, failed, 2), 30_000).unref();
-      return;
+  // Ни один адресат так и не принял заявку — помечаем как неудачу.
+  if (!delivered) await updateLead(lead.id, { telegramStatus: 'failed' });
+}
+
+interface TelegramCallbackQuery {
+  id: string;
+  data?: string;
+  from?: { first_name?: string };
+  message?: { chat: { id: number }; message_id: number };
+}
+
+export interface TelegramUpdate {
+  update_id: number;
+  callback_query?: TelegramCallbackQuery;
+}
+
+/** Нажатие кнопки под заявкой. Одна логика для long polling (localhost) и вебхука (Vercel). */
+export async function handleUpdate(update: TelegramUpdate): Promise<void> {
+  const query = update.callback_query;
+  if (!query) return;
+
+  // Кнопка-заглушка «уже в работе»: гасим спиннер и выходим.
+  if (!query.data?.startsWith('take:')) {
+    await call('answerCallbackQuery', { callback_query_id: query.id }).catch(() => undefined);
+    return;
+  }
+
+  const leadId = query.data.slice('take:'.length);
+  const lead = await getLead(leadId);
+  const manager = query.from?.first_name ?? 'менеджер';
+
+  if (lead) {
+    await updateLead(leadId, {
+      status: 'in_work',
+      managerNote: lead.managerNote || `Взял в работу: ${manager} (Telegram)`,
+    });
+    if (query.message) {
+      await call('editMessageReplyMarkup', {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id,
+        reply_markup: {
+          // callback_data, а не url: на локальном адресе Telegram
+          // отклонил бы кнопку-ссылку и правка сообщения не прошла бы.
+          inline_keyboard: [[{ text: `✅ В работе — ${manager}`, callback_data: 'taken' }, ...adminButton()]],
+        },
+      }).catch(() => undefined);
     }
-    // Ни один адресат так и не принял заявку — помечаем как неудачу.
-    if (!delivered) await updateLead(lead.id, { telegramStatus: 'failed' });
-  })();
+  }
+
+  await call('answerCallbackQuery', {
+    callback_query_id: query.id,
+    text: lead ? 'Заявка отмечена как «в работе»' : 'Заявка не найдена',
+  }).catch(() => undefined);
 }
 
 /**
- * Long polling для кнопки «Взять в работу». Включается флагом TELEGRAM_ENABLE_POLLING.
- * Вебхук не используем осознанно: на localhost он не работает без публичного туннеля.
+ * Long polling для кнопки «Взять в работу» на localhost. Включается флагом TELEGRAM_ENABLE_POLLING.
+ * На Vercel вместо него работает вебхук: там нет процесса, который жил бы между запросами.
  */
 export function startPolling(): void {
   if (!config.telegram.enabled || !config.telegram.enablePolling) return;
@@ -211,43 +313,9 @@ export function startPolling(): void {
           { offset, timeout: LONG_POLL_SECONDS, allowed_updates: ['callback_query'] },
           (LONG_POLL_SECONDS + 10) * 1000,
         );
-        for (const update of data.result ?? []) {
+        for (const update of (data.result ?? []) as TelegramUpdate[]) {
           offset = update.update_id + 1;
-          const query = update.callback_query;
-          if (!query) continue;
-
-          // Кнопка-заглушка «уже в работе»: гасим спиннер и идём дальше.
-          if (!query.data?.startsWith('take:')) {
-            await call('answerCallbackQuery', { callback_query_id: query.id }).catch(() => undefined);
-            continue;
-          }
-
-          const leadId = query.data.slice('take:'.length);
-          const lead = await getLead(leadId);
-          const manager = query.from?.first_name ?? 'менеджер';
-
-          if (lead) {
-            await updateLead(leadId, {
-              status: 'in_work',
-              managerNote: lead.managerNote || `Взял в работу: ${manager} (Telegram)`,
-            });
-            await call('editMessageReplyMarkup', {
-              chat_id: query.message.chat.id,
-              message_id: query.message.message_id,
-              reply_markup: {
-                // callback_data, а не url: на локальном адресе Telegram
-                // отклонил бы кнопку-ссылку и правка сообщения не прошла бы.
-                inline_keyboard: [
-                  [{ text: `✅ В работе — ${manager}`, callback_data: 'taken' }, ...adminButton()],
-                ],
-              },
-            }).catch(() => undefined);
-          }
-
-          await call('answerCallbackQuery', {
-            callback_query_id: query.id,
-            text: lead ? 'Заявка отмечена как «в работе»' : 'Заявка не найдена',
-          }).catch(() => undefined);
+          await handleUpdate(update);
         }
       } catch (error) {
         console.error('[telegram] polling:', (error as Error).message);

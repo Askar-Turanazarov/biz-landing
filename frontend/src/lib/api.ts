@@ -47,6 +47,28 @@ export interface QuizAnswerPayload {
   stepId: string;
   question: string;
   answer: string;
+  /** Машинный код варианта — по нему сервер считает подбор. */
+  value?: string;
+}
+
+export interface ServiceOffer {
+  id: string;
+  title: string;
+  /** Стартовая цена в сумах. */
+  priceFrom: number;
+  duration: string;
+}
+
+export type BudgetFit = 'ok' | 'close' | 'low' | 'unknown';
+export type DeadlineFit = 'ok' | 'tight' | 'unknown';
+
+/** Итог квиза: формат и цифры посчитаны сервером по прайсу, text — пояснение ИИ. */
+export interface QuizResult {
+  text: string;
+  service: ServiceOffer | null;
+  alternative: ServiceOffer | null;
+  budgetFit: BudgetFit;
+  deadlineFit: DeadlineFit;
 }
 
 export interface LeadPayload {
@@ -72,3 +94,6 @@ export const askAssistant = (sessionId: string, message: string) =>
 
 export const sendQuizStep = (sessionId: string, step: QuizAnswerPayload) =>
   api.post<{ comment: string }>('/quiz/step', { sessionId, ...step });
+
+export const getQuizResult = (sessionId: string, answers: QuizAnswerPayload[]) =>
+  api.post<QuizResult>('/quiz/result', { sessionId, answers });

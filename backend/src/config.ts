@@ -53,9 +53,17 @@ export const config = {
      * Перечисляются через запятую, заявка уходит в каждый чат отдельным сообщением.
      */
     chatIds: list(process.env.TELEGRAM_CHAT_ID),
-    enablePolling: bool(process.env.TELEGRAM_ENABLE_POLLING, false),
+    // На Vercel нет постоянного процесса: бесконечный цикл getUpdates там не живёт,
+    // нажатия кнопок приходят через вебхук.
+    enablePolling: bool(process.env.TELEGRAM_ENABLE_POLLING, false) && !process.env.VERCEL,
+    /** Секрет вебхука: Telegram присылает его в заголовке X-Telegram-Bot-Api-Secret-Token. */
+    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET?.trim() || '',
     get enabled(): boolean {
       return Boolean(this.botToken && this.chatIds.length);
+    },
+    /** Кнопку «Взять в работу» показываем, только если нажатия кто-то принимает. */
+    get acceptsCallbacks(): boolean {
+      return this.enablePolling || Boolean(this.webhookSecret);
     },
   },
 
@@ -63,6 +71,15 @@ export const config = {
     password: process.env.ADMIN_PASSWORD?.trim() || '',
     secret: process.env.ADMIN_SECRET?.trim() || '',
     sessionTtlMs: 12 * 60 * 60 * 1000,
+  },
+
+  /**
+   * Upstash Redis для деплоя на Vercel. Интеграция Vercel может назвать переменные
+   * по-своему (KV_REST_API_*), поэтому читаем оба варианта. Пусто — данные в JSON-файлах.
+   */
+  redis: {
+    url: process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim() || '',
+    token: process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim() || '',
   },
 } as const;
 

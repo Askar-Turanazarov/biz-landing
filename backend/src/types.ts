@@ -10,6 +10,46 @@ export interface QuizAnswer {
   stepId: string;
   question: string;
   answer: string;
+  /** Машинный код варианта: по нему считается квалификация. Текст answer — для людей. */
+  value?: string;
+}
+
+export type LeadTemperature = 'hot' | 'warm' | 'cold';
+export type BudgetFit = 'ok' | 'close' | 'low' | 'unknown';
+export type DeadlineFit = 'ok' | 'tight' | 'unknown';
+
+/** Услуга в том виде, в каком её показываем посетителю и менеджеру. */
+export interface ServiceOffer {
+  id: string;
+  title: string;
+  /** Стартовая цена в сумах. */
+  priceFrom: number;
+  duration: string;
+}
+
+/** Расчёт по ответам квиза: формат и цифры считает код, а не модель. */
+export interface QuizMatch {
+  service: ServiceOffer;
+  /** Формат подешевле, если бюджет ниже стартовой цены рекомендованного. */
+  alternative: ServiceOffer | null;
+  budgetFit: BudgetFit;
+  deadlineFit: DeadlineFit;
+  temperature: LeadTemperature;
+  score: number;
+  /** Короткие пометки для менеджера: на что обратить внимание. */
+  flags: string[];
+  /** Формат посетитель не выбрал — он подобран по цели и ситуации. */
+  inferred: boolean;
+}
+
+/** Квалификация заявки: расчёт по квизу (если был) плюс выжимка ИИ для менеджера. */
+export interface Qualification {
+  temperature: LeadTemperature | null;
+  match: QuizMatch | null;
+  summary: string;
+  /** Какая модель написала выжимку, 'mock' — запасной шаблон, '' — выжимки нет. */
+  summaryBy: string;
+  nextStep: string;
 }
 
 export interface Lead {
@@ -30,6 +70,8 @@ export interface Lead {
   ip: string;
   telegramStatus: TelegramStatus;
   telegramMessageId: number | null;
+  /** Заполняется в фоне после приёма заявки; null — квалифицировать было не по чему. */
+  qualification: Qualification | null;
 }
 
 export type ChatRole = 'user' | 'assistant';

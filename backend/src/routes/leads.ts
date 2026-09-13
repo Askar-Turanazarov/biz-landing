@@ -1,10 +1,12 @@
-/** Публичный приём заявок: валидация, антиспам, запись, уведомление в Telegram. */
+/** Публичный приём заявок: валидация, антиспам, запись; квалификация и Telegram — в фоне. */
 import { Router } from 'express';
 import { createLead } from '../services/leadStore.js';
 import { linkLead, getSession } from '../services/sessionStore.js';
-import { notifyLead } from '../services/telegram.js';
+import { normalizeQuizAnswers } from '../services/qualification.js';
+import { processLead } from '../services/leadProcessing.js';
 import { rateLimit, clientIp } from '../middleware/rateLimit.js';
-import type { ContactType, LeadSource, QuizAnswer } from '../types.js';
+import { asyncRoute } from '../middleware/asyncRoute.js';
+import type { ContactType, LeadSource } from '../types.js';
 
 export const leadsRouter = Router();
 
@@ -28,18 +30,6 @@ function clean(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
-function normalizeQuiz(raw: unknown): QuizAnswer[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .slice(0, 12)
-    .map((item) => ({
-      stepId: clean((item as QuizAnswer)?.stepId, 40),
-      question: clean((item as QuizAnswer)?.question, 200),
-      answer: clean((item as QuizAnswer)?.answer, 200),
-    }))
-    .filter((a) => a.stepId && a.answer);
-}
-
 function normalizeUtm(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object') return {};
   const out: Record<string, string> = {};
@@ -54,7 +44,7 @@ function normalizeUtm(raw: unknown): Record<string, string> {
 leadsRouter.post(
   '/leads',
   rateLimit({ windowMs: 10 * 60 * 1000, max: 5, message: 'Заявка уже отправлена. Мы свяжемся с вами.' }),
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     const body = req.body ?? {};
 
     // Ловушка для ботов: поле скрыто в разметке, человек его не заполнит.
@@ -93,13 +83,12 @@ leadsRouter.post(
       : 'form';
 
     const sessionId = clean(body.sessionId, 64) || null;
+    const session = sessionId ? await getSession(sessionId) : null;
 
     // Ответы квиза берём из серверной сессии — она надёжнее того, что прислал клиент.
-    let quizAnswers = normalizeQuiz(body.quizAnswers);
-    if (sessionId) {
-      const session = await getSession(sessionId);
-      if (session?.quizAnswers.length) quizAnswers = session.quizAnswers;
-    }
+    const quizAnswers = session?.quizAnswers.length
+      ? session.quizAnswers
+      : normalizeQuizAnswers(body.quizAnswers);
 
     const lead = await createLead({
       name,
@@ -117,8 +106,10 @@ leadsRouter.post(
 
     if (sessionId) await linkLead(sessionId, lead.id);
 
-    // Отвечаем сразу: Telegram не должен задерживать или ломать приём заявки.
+    // Отвечаем сразу: ни модель, ни Telegram не должны задерживать или ломать приём заявки.
     res.status(201).json({ ok: true, id: lead.id });
-    notifyLead(lead);
-  },
+    void processLead(lead, session?.messages ?? []).catch((error) =>
+      console.error('[lead] фоновая обработка:', (error as Error).message),
+    );
+  }),
 );

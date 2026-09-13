@@ -13,6 +13,7 @@ import {
 } from './adminApi';
 import { Close, Phone } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
+import { QualificationBlock } from './QualificationBlock';
 
 const STATUSES: LeadStatus[] = ['new', 'in_work', 'won', 'lost'];
 
@@ -142,6 +143,8 @@ export function LeadDrawer({ lead, onClose, onChanged, onDeleted }: LeadDrawerPr
                 ))}
               </div>
             </Block>
+
+            <QualificationBlock qualification={lead.qualification} />
 
             {lead.comment && (
               <Block title="Комментарий клиента">

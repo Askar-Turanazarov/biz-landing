@@ -13,6 +13,7 @@ import {
 } from './adminApi';
 import { LoginForm } from './LoginForm';
 import { LeadDrawer } from './LeadDrawer';
+import { TemperatureBadge } from './QualificationBlock';
 
 const EMPTY_FILTERS: LeadFilters = { status: 'all', source: 'all', query: '' };
 
@@ -182,6 +183,7 @@ export default function SuperAdminPage() {
                     <th className="px-5 py-4 font-medium">Контакт</th>
                     <th className="px-5 py-4 font-medium">Источник</th>
                     <th className="px-5 py-4 font-medium">Статус</th>
+                    <th className="px-5 py-4 font-medium">Метка</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -211,6 +213,9 @@ export default function SuperAdminPage() {
                         >
                           {STATUS_LABEL[lead.status]}
                         </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <TemperatureBadge temperature={lead.qualification?.temperature} />
                       </td>
                     </tr>
                   ))}

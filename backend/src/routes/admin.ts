@@ -10,6 +10,7 @@ import {
 } from '../services/leadStore.js';
 import { getSession } from '../services/sessionStore.js';
 import { chainStatus } from '../services/llm/index.js';
+import { TEMPERATURE_TEXT } from '../services/qualification.js';
 import {
   ADMIN_COOKIE,
   checkPassword,
@@ -20,7 +21,8 @@ import {
   registerFailedLogin,
   requireAdmin,
 } from '../middleware/auth.js';
-import type { LeadStatus } from '../types.js';
+import { asyncRoute } from '../middleware/asyncRoute.js';
+import type { Lead, LeadStatus } from '../types.js';
 
 export const adminRouter = Router();
 
@@ -68,13 +70,19 @@ function filterFrom(query: Record<string, unknown>): LeadFilter {
   };
 }
 
-adminRouter.get('/admin/leads', async (req, res) => {
-  res.json({ leads: await listLeads(filterFrom(req.query as Record<string, unknown>)) });
-});
+adminRouter.get(
+  '/admin/leads',
+  asyncRoute(async (req, res) => {
+    res.json({ leads: await listLeads(filterFrom(req.query as Record<string, unknown>)) });
+  }),
+);
 
-adminRouter.get('/admin/stats', async (_req, res) => {
-  res.json(await getStats());
-});
+adminRouter.get(
+  '/admin/stats',
+  asyncRoute(async (_req, res) => {
+    res.json(await getStats());
+  }),
+);
 
 adminRouter.get('/admin/health', (_req, res) => {
   res.json(chainStatus());
@@ -82,47 +90,56 @@ adminRouter.get('/admin/health', (_req, res) => {
 
 const STATUSES: LeadStatus[] = ['new', 'in_work', 'won', 'lost'];
 
-adminRouter.patch('/admin/leads/:id', async (req, res) => {
-  const patch: Record<string, unknown> = {};
-  const status = req.body?.status;
-  if (typeof status === 'string') {
-    if (!STATUSES.includes(status as LeadStatus)) {
-      res.status(400).json({ error: 'Неизвестный статус' });
+adminRouter.patch(
+  '/admin/leads/:id',
+  asyncRoute(async (req, res) => {
+    const patch: Record<string, unknown> = {};
+    const status = req.body?.status;
+    if (typeof status === 'string') {
+      if (!STATUSES.includes(status as LeadStatus)) {
+        res.status(400).json({ error: 'Неизвестный статус' });
+        return;
+      }
+      patch.status = status;
+    }
+    if (typeof req.body?.managerNote === 'string') {
+      patch.managerNote = req.body.managerNote.slice(0, 2000);
+    }
+
+    const lead = await updateLead(req.params.id, patch);
+    if (!lead) {
+      res.status(404).json({ error: 'Заявка не найдена' });
       return;
     }
-    patch.status = status;
-  }
-  if (typeof req.body?.managerNote === 'string') {
-    patch.managerNote = req.body.managerNote.slice(0, 2000);
-  }
+    res.json({ lead });
+  }),
+);
 
-  const lead = await updateLead(req.params.id, patch);
-  if (!lead) {
-    res.status(404).json({ error: 'Заявка не найдена' });
-    return;
-  }
-  res.json({ lead });
-});
-
-adminRouter.delete('/admin/leads/:id', async (req, res) => {
-  const removed = await deleteLead(req.params.id);
-  if (!removed) {
-    res.status(404).json({ error: 'Заявка не найдена' });
-    return;
-  }
-  res.json({ ok: true });
-});
+adminRouter.delete(
+  '/admin/leads/:id',
+  asyncRoute(async (req, res) => {
+    const removed = await deleteLead(req.params.id);
+    if (!removed) {
+      res.status(404).json({ error: 'Заявка не найдена' });
+      return;
+    }
+    res.json({ ok: true });
+  }),
+);
 
 /** Диалог посетителя целиком — видно, о чём он спрашивал до заявки. */
-adminRouter.get('/admin/leads/:id/dialog', async (req, res) => {
-  const lead = await getLead(req.params.id);
-  if (!lead) {
-    res.status(404).json({ error: 'Заявка не найдена' });
-    return;
-  }
-  const session = lead.sessionId ? await getSession(lead.sessionId) : null;
-  res.json({ messages: session?.messages ?? [], quizAnswers: session?.quizAnswers ?? [] });
-});
+adminRouter.get(
+  '/admin/leads/:id/dialog',
+  asyncRoute(async (req, res) => {
+    const lead = await getLead(req.params.id);
+    if (!lead) {
+      res.status(404).json({ error: 'Заявка не найдена' });
+      return;
+    }
+    const session = lead.sessionId ? await getSession(lead.sessionId) : null;
+    res.json({ messages: session?.messages ?? [], quizAnswers: session?.quizAnswers ?? [] });
+  }),
+);
 
 const CSV_HEADERS = [
   'Дата',
@@ -131,6 +148,7 @@ const CSV_HEADERS = [
   'Тип контакта',
   'Источник',
   'Статус',
+  'Квалификация',
   'Комментарий',
   'Ответы квиза',
   'Заметка менеджера',
@@ -141,28 +159,40 @@ function csvCell(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-adminRouter.get('/admin/leads-export.csv', async (req, res) => {
-  const leads = await listLeads(filterFrom(req.query as Record<string, unknown>));
-  const rows = leads.map((lead) =>
-    [
-      new Date(lead.createdAt).toLocaleString('ru-RU'),
-      lead.name,
-      lead.contact,
-      lead.contactType,
-      lead.source,
-      lead.status,
-      lead.comment,
-      lead.quizAnswers.map((a) => `${a.question}: ${a.answer}`).join(' | '),
-      lead.managerNote,
-      Object.entries(lead.utm).map(([k, v]) => `${k}=${v}`).join(' '),
-    ]
-      .map(csvCell)
-      .join(';'),
-  );
+function qualificationCell(lead: Lead): string {
+  const q = lead.qualification;
+  if (!q) return '';
+  return [q.temperature ? TEMPERATURE_TEXT[q.temperature] : '', q.match?.service.title ?? '', q.summary]
+    .filter(Boolean)
+    .join(' · ');
+}
 
-  // BOM + разделитель «;» — иначе Excel на Windows открывает кириллицу кракозябрами.
-  const csv = '﻿' + [CSV_HEADERS.map(csvCell).join(';'), ...rows].join('\r\n');
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="leads-${Date.now()}.csv"`);
-  res.send(csv);
-});
+adminRouter.get(
+  '/admin/leads-export.csv',
+  asyncRoute(async (req, res) => {
+    const leads = await listLeads(filterFrom(req.query as Record<string, unknown>));
+    const rows = leads.map((lead) =>
+      [
+        new Date(lead.createdAt).toLocaleString('ru-RU'),
+        lead.name,
+        lead.contact,
+        lead.contactType,
+        lead.source,
+        lead.status,
+        qualificationCell(lead),
+        lead.comment,
+        lead.quizAnswers.map((a) => `${a.question}: ${a.answer}`).join(' | '),
+        lead.managerNote,
+        Object.entries(lead.utm).map(([k, v]) => `${k}=${v}`).join(' '),
+      ]
+        .map(csvCell)
+        .join(';'),
+    );
+
+    // BOM + разделитель «;» — иначе Excel на Windows открывает кириллицу кракозябрами.
+    const csv = '﻿' + [CSV_HEADERS.map(csvCell).join(';'), ...rows].join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="leads-${Date.now()}.csv"`);
+    res.send(csv);
+  }),
+);

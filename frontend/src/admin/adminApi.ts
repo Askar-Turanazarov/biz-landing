@@ -1,12 +1,31 @@
-import { api } from '../lib/api';
+import { api, type BudgetFit, type DeadlineFit, type ServiceOffer } from '../lib/api';
 
 export type LeadStatus = 'new' | 'in_work' | 'won' | 'lost';
 export type LeadSource = 'form' | 'quiz' | 'chat';
+export type LeadTemperature = 'hot' | 'warm' | 'cold';
 
 export interface QuizAnswer {
   stepId: string;
   question: string;
   answer: string;
+  value?: string;
+}
+
+/** Квалификация заявки: расчёт по прайсу (если был квиз) и выжимка ИИ. */
+export interface Qualification {
+  temperature: LeadTemperature | null;
+  match: {
+    service: ServiceOffer;
+    alternative: ServiceOffer | null;
+    budgetFit: BudgetFit;
+    deadlineFit: DeadlineFit;
+    score: number;
+    flags: string[];
+    inferred: boolean;
+  } | null;
+  summary: string;
+  summaryBy: string;
+  nextStep: string;
 }
 
 export interface Lead {
@@ -26,6 +45,8 @@ export interface Lead {
   userAgent: string;
   ip: string;
   telegramStatus: 'pending' | 'sent' | 'failed' | 'skipped';
+  /** Появляется через пару секунд после заявки; у старых заявок поля нет. */
+  qualification?: Qualification | null;
 }
 
 export interface Stats {
@@ -89,6 +110,31 @@ export const STATUS_STYLE: Record<LeadStatus, string> = {
   in_work: 'bg-amber-400/15 text-amber-300 border-amber-400/30',
   won: 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30',
   lost: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+};
+
+export const TEMPERATURE_LABEL: Record<LeadTemperature, string> = {
+  hot: 'Горячая',
+  warm: 'Тёплая',
+  cold: 'Холодная',
+};
+
+export const TEMPERATURE_STYLE: Record<LeadTemperature, string> = {
+  hot: 'bg-rose-400/15 text-rose-300 border-rose-400/30',
+  warm: 'bg-amber-400/15 text-amber-300 border-amber-400/30',
+  cold: 'bg-sky-400/15 text-sky-300 border-sky-400/30',
+};
+
+export const BUDGET_FIT_LABEL: Record<BudgetFit, string> = {
+  ok: 'укладывается',
+  close: 'у нижней границы',
+  low: 'ниже стартовой цены',
+  unknown: 'не назван',
+};
+
+export const DEADLINE_FIT_LABEL: Record<DeadlineFit, string> = {
+  ok: 'реалистичный',
+  tight: 'жёсткий',
+  unknown: 'не указан',
 };
 
 export const SOURCE_LABEL: Record<LeadSource, string> = {
