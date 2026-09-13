@@ -50,7 +50,8 @@ export function Hero({ onOpenQuiz, onScrollToForm }: HeroProps) {
                 transition={{ duration: 0.7, delay: 0.08 + index * 0.045, ease: [0.16, 1, 0.3, 1] }}
               >
                 {word === 'заявки,' ? <span className="text-gradient">{word}</span> : word}
-                {' '}
+                {/* Неразрывный пробел: обычный браузер отбрасывает в конце inline-block, и слова слипаются. */}
+                {' '}
               </motion.span>
             ))}
           </h1>
